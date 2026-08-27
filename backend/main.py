@@ -70,3 +70,6 @@ async def root() -> dict:
         "version": "1.0.0",
         "status": "running",
     }
+from api.ingest import router as ingest_router
+
+app.include_router(ingest_router)

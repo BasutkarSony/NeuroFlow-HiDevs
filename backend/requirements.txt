@@ -16,3 +16,5 @@ sentence-transformers==6.0.0
 tiktoken==0.14.0
 
 scipy
+
+mlflow

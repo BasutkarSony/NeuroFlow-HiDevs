@@ -8,6 +8,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from config import get_settings
 from api.query import router as query_router
 from api.rating import router as rating_router
+from api.finetune import router as finetune_router
 from db.health import check_all
 from db.migrations import ensure_schema
 from db.pool import db_pool
@@ -76,3 +77,5 @@ async def root() -> dict:
 app.include_router(query_router)
 
 app.include_router(rating_router)
+
+app.include_router(finetune_router)

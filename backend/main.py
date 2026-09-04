@@ -6,7 +6,8 @@ from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from config import get_settings
-from api.query import router as query_router
+from api.query import router as query_router, configure_provider
+from api.evaluations import router as evaluations_router
 from api.rating import router as rating_router
 from api.finetune import router as finetune_router
 from api.pipelines import router as pipelines_router
@@ -14,6 +15,8 @@ from api.compare import router as compare_router
 from db.health import check_all
 from db.migrations import ensure_schema
 from db.pool import db_pool
+from providers.openai_provider import OpenAIProvider
+from providers.openai_provider import OpenAIProvider
 
 
 settings = get_settings()
@@ -26,6 +29,12 @@ async def lifespan(app: FastAPI):
     pool = await db_pool.create()
 
     await ensure_schema(pool)
+    configure_provider(
+        OpenAIProvider(
+            model="gpt-4o-mini",
+            api_key=settings.llm_api_key,
+        )
+    )
 
     yield
 
@@ -77,6 +86,7 @@ async def root() -> dict:
     }
 
 app.include_router(query_router)
+app.include_router(evaluations_router)
 
 app.include_router(rating_router)
 

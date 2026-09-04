@@ -9,6 +9,8 @@ from sse_starlette.sse import EventSourceResponse
 from db.pool import db_pool
 from pipelines.generation.generator import RAGGenerator
 from pipelines.retrieval.pipeline import RetrievalPipeline
+from providers.openai_provider import OpenAIProvider
+from config import get_settings
 
 
 router = APIRouter()
@@ -165,7 +167,17 @@ async def _run_stream(
         )
 
 
+_provider = None
+
+
+def configure_provider(provider):
+    global _provider
+    _provider = provider
+
+
 def _get_provider():
-    raise RuntimeError(
-        "No LLM provider configured for query generation."
-    )
+    if _provider is None:
+        raise RuntimeError(
+            "No LLM provider configured for query generation."
+        )
+    return _provider

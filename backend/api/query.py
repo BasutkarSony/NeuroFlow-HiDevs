@@ -1,8 +1,10 @@
 import asyncio
 import json
+import time
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
+from monitoring.metrics import queries_total, retrieval_latency, generation_latency, queue_depth
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 
@@ -30,9 +32,13 @@ async def query(request: QueryRequest):
     db = db_pool.get_pool()
 
     retrieval = RetrievalPipeline(db=db)
+    retrieval_start = time.perf_counter()
     context_result = await retrieval.retrieve(
         request.query,
         k=10,
+    )
+    retrieval_latency.labels(strategy="hybrid").observe(
+        time.perf_counter() - retrieval_start
     )
 
     if request.stream:
@@ -40,6 +46,7 @@ async def query(request: QueryRequest):
 
         queue: asyncio.Queue = asyncio.Queue()
         _active_streams[run_id] = queue
+        queue_depth.set(len(_active_streams))
 
         asyncio.create_task(
             _run_stream(
@@ -83,6 +90,7 @@ async def query_stream(run_id: str):
                     break
         finally:
             _active_streams.pop(run_id, None)
+            queue_depth.set(len(_active_streams))
 
     return EventSourceResponse(
         events(),
@@ -151,6 +159,7 @@ async def _run_stream(
             db=db,
         )
 
+        generation_start = time.perf_counter()
         async for event in generator.stream(
             query=query,
             context_result=context_result,

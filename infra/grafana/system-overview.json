@@ -1,0 +1,83 @@
+{
+  "title": "NeuroFlow System Overview",
+  "uid": "neuroflow-system",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "15s",
+  "panels": [
+    {
+      "title": "Queries per Minute",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "targets": [
+        {
+          "expr": "sum(rate(neuroflow_queries_total[1m])) * 60",
+          "legendFormat": "queries/min"
+        }
+      ]
+    },
+    {
+      "title": "Retrieval Latency P50 / P95",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(neuroflow_retrieval_latency_seconds_bucket[5m])) by (le))",
+          "legendFormat": "P50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(neuroflow_retrieval_latency_seconds_bucket[5m])) by (le))",
+          "legendFormat": "P95"
+        }
+      ]
+    },
+    {
+      "title": "Generation Latency P50 / P95",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(neuroflow_generation_latency_seconds_bucket[5m])) by (le))",
+          "legendFormat": "P50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(neuroflow_generation_latency_seconds_bucket[5m])) by (le))",
+          "legendFormat": "P95"
+        }
+      ]
+    },
+    {
+      "title": "LLM Cost per Hour",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "targets": [
+        {
+          "expr": "sum(increase(neuroflow_llm_cost_usd_sum[1h]))",
+          "legendFormat": "USD/hour"
+        }
+      ]
+    },
+    {
+      "title": "Queue Depth",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+      "targets": [
+        {
+          "expr": "neuroflow_queue_depth",
+          "legendFormat": "queue"
+        }
+      ]
+    },
+    {
+      "title": "Circuit Breakers Open",
+      "type": "stat",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+      "targets": [
+        {
+          "expr": "neuroflow_circuit_breakers_open",
+          "legendFormat": "open"
+        }
+      ]
+    }
+  ]
+}

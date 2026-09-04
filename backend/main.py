@@ -1,9 +1,24 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Response
+from monitoring.metrics import *
+from fastapi import FastAPI
+from fastapi.responses import Response, Response
 from opentelemetry import trace
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+
+def _initialize_metrics():
+    queries_total.labels(pipeline_id="default", status="success")
+    queries_total.labels(pipeline_id="default", status="error")
+    ingestion_docs_total.labels(source_type="unknown")
+    llm_calls_total.labels(provider="unknown", model="unknown", task_type="unknown")
+    circuit_breaker_trips_total.labels(provider="unknown")
+    retrieval_latency.labels(strategy="hybrid")
+    generation_latency.labels(model="unknown")
+    llm_cost.labels(model="unknown")
+    eval_faithfulness.labels(pipeline_id="default")
+    eval_overall.labels(pipeline_id="default")
+
 
 from config import get_settings
 from api.query import router as query_router, configure_provider
@@ -40,6 +55,8 @@ async def lifespan(app: FastAPI):
 
     await db_pool.close()
 
+
+_initialize_metrics()
 
 app = FastAPI(
     title=settings.app_name,

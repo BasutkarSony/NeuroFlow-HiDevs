@@ -3,7 +3,7 @@ import json
 import time
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from monitoring.metrics import queries_total, retrieval_latency, generation_latency, queue_depth
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
@@ -13,6 +13,12 @@ from pipelines.generation.generator import RAGGenerator
 from pipelines.retrieval.pipeline import RetrievalPipeline
 from providers.openai_provider import OpenAIProvider
 from config import get_settings
+from security.auth import ClientProfile, require_scope
+from security.prompt_injection import (
+    classify_prompt_injection,
+    detect_prompt_injection,
+)
+from security.validators import validate_query
 
 
 router = APIRouter()
@@ -28,7 +34,32 @@ _active_streams: dict[str, asyncio.Queue] = {}
 
 
 @router.post("/query")
-async def query(request: QueryRequest):
+async def query(
+    request: QueryRequest,
+    current_user: ClientProfile = Depends(require_scope("query")),
+):
+    sanitized_query = validate_query(request.query)
+
+    # Layer 1: detect and record, but do not reject.
+    injection_metadata = detect_prompt_injection(sanitized_query)
+
+    # Layer 2: LLM classification for every user query.
+    provider = _get_provider()
+
+    if await classify_prompt_injection(
+        sanitized_query,
+        provider,
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "query_rejected",
+                "reason": "potential_prompt_injection",
+            },
+        )
+
+    request.query = sanitized_query
+
     db = db_pool.get_pool()
 
     retrieval = RetrievalPipeline(db=db)

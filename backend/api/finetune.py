@@ -1,7 +1,7 @@
 import json
 import uuid
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict
 
 from db.pool import db_pool
@@ -15,6 +15,7 @@ from pipelines.finetuning.job_manager import (
 from pipelines.finetuning.tracker import (
     start_training_job,
 )
+from security.auth import ClientProfile, require_scope
 
 
 router = APIRouter(prefix="/finetune")
@@ -61,7 +62,10 @@ async def preview_training_data():
 
 
 @router.post("/jobs")
-async def create_finetune_job(request: FinetuneRequest):
+async def create_finetune_job(
+    request: FinetuneRequest,
+    current_user: ClientProfile = Depends(require_scope("admin")),
+):
     db = db_pool.get_pool()
     job_id = str(uuid.uuid4())
 

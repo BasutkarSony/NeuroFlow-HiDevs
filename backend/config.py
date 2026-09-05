@@ -88,6 +88,28 @@ class Settings(BaseSettings):
         description="LLM provider API key.",
     )
 
+    # Security
+    jwt_secret_key: str = Field(
+        default="dev-only-change-this-secret",
+        description="Secret key used to sign JWT access tokens.",
+    )
+    jwt_algorithm: str = Field(
+        default="HS256",
+        description="JWT signing algorithm.",
+    )
+    jwt_expire_seconds: int = Field(
+        default=3600,
+        description="JWT access token lifetime in seconds.",
+    )
+    auth_client_id: str = Field(
+        default="neuroflow-client",
+        description="Configured API client identifier.",
+    )
+    auth_client_secret: str = Field(
+        default="dev-client-secret",
+        description="Configured API client secret.",
+    )
+
     @property
     def postgres_dsn(self) -> str:
         """Return the asyncpg PostgreSQL connection URL."""

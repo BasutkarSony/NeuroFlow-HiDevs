@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 
 from monitoring.metrics import *
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import Response, Response
 from opentelemetry import trace
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
@@ -27,6 +27,13 @@ from api.rating import router as rating_router
 from api.finetune import router as finetune_router
 from api.pipelines import router as pipelines_router
 from api.compare import router as compare_router
+from api.ingest import router as ingest_router
+from security.auth import (
+    TokenRequest,
+    authenticate_client,
+    get_current_user,
+    _create_access_token,
+)
 from db.health import check_all
 from db.migrations import ensure_schema
 from db.pool import db_pool
@@ -63,11 +70,55 @@ app = FastAPI(
     description="Production multi-modal LLM orchestration platform.",
     version="1.0.0",
     lifespan=lifespan,
+    dependencies=[Depends(get_current_user)],
 )
 
 
 FastAPIInstrumentor.instrument_app(app)
 
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    """Add baseline security headers to every response."""
+    import uuid
+
+    response = await call_next(request)
+
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000"
+    response.headers["Content-Security-Policy"] = "default-src 'self'"
+    response.headers["X-Request-ID"] = str(uuid.uuid4())
+
+    return response
+
+
+
+@app.post("/auth/token")
+async def create_token(request: TokenRequest) -> dict:
+    """Issue a JWT access token for a configured client."""
+    profile = authenticate_client(
+        request.client_id,
+        request.client_secret,
+    )
+
+    if profile is None:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid client credentials",
+        )
+
+    access_token = _create_access_token(
+        profile.client_id,
+        profile.scopes,
+    )
+
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "expires_in": 3600,
+    }
 
 @app.get("/health")
 async def health() -> dict:
@@ -110,3 +161,4 @@ app.include_router(rating_router)
 app.include_router(finetune_router)
 app.include_router(pipelines_router)
 app.include_router(compare_router)
+app.include_router(ingest_router)

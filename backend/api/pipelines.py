@@ -2,17 +2,25 @@ import json
 import statistics
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from db.pool import db_pool
 from models.pipeline import PipelineConfig
+from security.auth import ClientProfile, require_scope
+from security.validators import sanitize_text, validate_pipeline_name
 
 
 router = APIRouter(prefix="/pipelines")
 
 
 @router.post("")
-async def create_pipeline(config: PipelineConfig):
+async def create_pipeline(
+    config: PipelineConfig,
+    current_user: ClientProfile = Depends(require_scope("admin")),
+):
+    config.name = validate_pipeline_name(config.name)
+    config.description = sanitize_text(config.description).strip()
+
     db = db_pool.get_pool()
 
     row = await db.fetchrow(
@@ -125,6 +133,9 @@ async def update_pipeline(
     pipeline_id: str,
     config: PipelineConfig,
 ):
+    config.name = validate_pipeline_name(config.name)
+    config.description = sanitize_text(config.description).strip()
+
     db = db_pool.get_pool()
 
     current = await db.fetchrow(

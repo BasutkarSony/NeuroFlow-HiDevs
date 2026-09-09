@@ -1,0 +1,6 @@
+{
+  "test_count": 30,
+  "pearson_correlation": null,
+  "status": "pending_real_evaluator_run",
+  "note": "Correlation must be computed after running the LLM evaluator against the annotated calibration set."
+}

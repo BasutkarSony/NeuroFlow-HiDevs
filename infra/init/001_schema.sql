@@ -96,3 +96,5 @@ CREATE TABLE finetune_jobs (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     completed_at TIMESTAMPTZ
 );
+CREATE INDEX IF NOT EXISTS chunks_metadata_gin_idx
+    ON chunks USING gin (metadata);

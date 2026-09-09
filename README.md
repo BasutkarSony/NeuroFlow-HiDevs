@@ -109,3 +109,7 @@ NeuroFlow-HiDevs/
 │   └── adr/
 ├── .gitignore
 └── README.md
+```
+## Production Deployment
+
+The production stack uses Nginx for TLS termination with a self-signed certificate for development/testing. For production, replace `infra/nginx/certs/server.crt` and `infra/nginx/certs/server.key` with certificates issued by Let's Encrypt (for example, using Certbot), while keeping the same certificate paths configured in Nginx.

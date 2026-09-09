@@ -1,0 +1,182 @@
+[
+  {
+    "query": "What is photosynthesis?",
+    "answer": "Photosynthesis converts light energy into chemical energy.",
+    "context": "Photosynthesis converts light energy into chemical energy in plants.",
+    "human_score": 1.0
+  },
+  {
+    "query": "What is HNSW?",
+    "answer": "HNSW is a graph-based approximate nearest-neighbor index.",
+    "context": "HNSW is a graph-based approximate nearest-neighbor method for vector search.",
+    "human_score": 1.0
+  },
+  {
+    "query": "What does TCP provide?",
+    "answer": "TCP provides reliable, ordered delivery.",
+    "context": "TCP provides reliable and ordered delivery of data.",
+    "human_score": 1.0
+  },
+  {
+    "query": "What is SQL?",
+    "answer": "SQL is used to query relational databases.",
+    "context": "SQL is a language used to query and manage relational databases.",
+    "human_score": 1.0
+  },
+  {
+    "query": "What is Python?",
+    "answer": "Python is a programming language.",
+    "context": "Python is a high-level programming language.",
+    "human_score": 1.0
+  },
+  {
+    "query": "What is an API?",
+    "answer": "An API defines how software components communicate.",
+    "context": "An API defines rules for communication between software components.",
+    "human_score": 1.0
+  },
+  {
+    "query": "What is Redis?",
+    "answer": "Redis is an in-memory data store.",
+    "context": "Redis is an in-memory data structure store.",
+    "human_score": 1.0
+  },
+  {
+    "query": "What is PostgreSQL?",
+    "answer": "PostgreSQL is a relational database system.",
+    "context": "PostgreSQL is an open-source relational database system.",
+    "human_score": 1.0
+  },
+  {
+    "query": "What is JSON?",
+    "answer": "JSON is a structured data format.",
+    "context": "JSON is a lightweight structured data interchange format.",
+    "human_score": 1.0
+  },
+  {
+    "query": "What is Docker?",
+    "answer": "Docker packages applications into containers.",
+    "context": "Docker packages applications and dependencies into containers.",
+    "human_score": 1.0
+  },
+  {
+    "query": "What is machine learning?",
+    "answer": "Machine learning allows systems to learn patterns from data.",
+    "context": "Machine learning enables systems to learn patterns from data.",
+    "human_score": 1.0
+  },
+  {
+    "query": "What is an embedding?",
+    "answer": "An embedding represents information as a vector.",
+    "context": "An embedding represents data as a numerical vector.",
+    "human_score": 1.0
+  },
+  {
+    "query": "What is RAG?",
+    "answer": "RAG combines retrieval with generation.",
+    "context": "Retrieval-augmented generation combines retrieved context with language-model generation.",
+    "human_score": 1.0
+  },
+  {
+    "query": "What is cosine similarity?",
+    "answer": "Cosine similarity measures the angle between vectors.",
+    "context": "Cosine similarity measures similarity based on the angle between vectors.",
+    "human_score": 1.0
+  },
+  {
+    "query": "What is FastAPI?",
+    "answer": "FastAPI is a Python web framework.",
+    "context": "FastAPI is a modern Python framework for building APIs.",
+    "human_score": 1.0
+  },
+  {
+    "query": "What is an index?",
+    "answer": "An index can speed up database queries.",
+    "context": "Database indexes can improve query performance.",
+    "human_score": 1.0
+  },
+  {
+    "query": "What is caching?",
+    "answer": "Caching stores frequently used data for faster access.",
+    "context": "Caching stores data temporarily to reduce repeated expensive operations.",
+    "human_score": 1.0
+  },
+  {
+    "query": "What is concurrency?",
+    "answer": "Concurrency allows multiple tasks to make progress.",
+    "context": "Concurrency allows multiple tasks to progress during overlapping periods.",
+    "human_score": 1.0
+  },
+  {
+    "query": "What is an LLM?",
+    "answer": "An LLM is a model trained to process and generate language.",
+    "context": "A large language model is trained on text to process and generate language.",
+    "human_score": 1.0
+  },
+  {
+    "query": "What is inference?",
+    "answer": "Inference is the process of using a trained model to produce predictions.",
+    "context": "Inference uses a trained machine-learning model to produce predictions.",
+    "human_score": 1.0
+  },
+  {
+    "query": "What is vector search?",
+    "answer": "Vector search retrieves items using vector similarity.",
+    "context": "Vector search retrieves items according to similarity between numerical vectors.",
+    "human_score": 1.0
+  },
+  {
+    "query": "What is an HTTP request?",
+    "answer": "An HTTP request asks a server to perform an operation.",
+    "context": "An HTTP request is a message sent by a client to a server.",
+    "human_score": 1.0
+  },
+  {
+    "query": "What is a database transaction?",
+    "answer": "A transaction groups database operations into a unit of work.",
+    "context": "A database transaction groups operations into a logical unit of work.",
+    "human_score": 1.0
+  },
+  {
+    "query": "What is a primary key?",
+    "answer": "A primary key uniquely identifies a row.",
+    "context": "A primary key uniquely identifies each row in a relational table.",
+    "human_score": 1.0
+  },
+  {
+    "query": "What is a foreign key?",
+    "answer": "A foreign key links rows between tables.",
+    "context": "A foreign key references a key in another table.",
+    "human_score": 1.0
+  },
+  {
+    "query": "What is a queue?",
+    "answer": "A queue stores tasks waiting to be processed.",
+    "context": "A queue holds work items until they can be processed.",
+    "human_score": 1.0
+  },
+  {
+    "query": "What is asynchronous programming?",
+    "answer": "It allows waiting operations without blocking other work.",
+    "context": "Asynchronous programming allows tasks to wait for I/O without blocking execution.",
+    "human_score": 1.0
+  },
+  {
+    "query": "What is a transformer?",
+    "answer": "A transformer uses attention mechanisms to process sequences.",
+    "context": "Transformers use attention mechanisms to process sequence data.",
+    "human_score": 1.0
+  },
+  {
+    "query": "What is a tokenizer?",
+    "answer": "A tokenizer converts text into smaller units.",
+    "context": "A tokenizer converts text into tokens used by language models.",
+    "human_score": 1.0
+  },
+  {
+    "query": "What is model fine-tuning?",
+    "answer": "Fine-tuning adapts a pretrained model using additional training data.",
+    "context": "Fine-tuning continues training a pretrained model on task-specific data.",
+    "human_score": 1.0
+  }
+]

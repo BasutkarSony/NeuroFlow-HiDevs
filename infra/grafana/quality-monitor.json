@@ -1,0 +1,65 @@
+{
+  "title": "NeuroFlow Quality Monitor",
+  "uid": "neuroflow-quality",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "panels": [
+    {
+      "title": "Faithfulness by Pipeline",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "targets": [
+        {
+          "expr": "neuroflow_eval_faithfulness",
+          "legendFormat": "{{pipeline_id}}"
+        }
+      ]
+    },
+    {
+      "title": "Overall Score Trend",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "targets": [
+        {
+          "expr": "neuroflow_eval_overall",
+          "legendFormat": "{{pipeline_id}}"
+        }
+      ]
+    },
+    {
+      "title": "Documents Ingested per Day",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "targets": [
+        {
+          "expr": "sum(increase(neuroflow_ingestion_docs_total[1d]))",
+          "legendFormat": "documents/day"
+        }
+      ]
+    },
+    {
+      "title": "Evaluation Metrics",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "targets": [
+        {
+          "expr": "neuroflow_eval_faithfulness",
+          "legendFormat": "faithfulness {{pipeline_id}}"
+        }
+      ]
+    },
+    {
+      "title": "Fine-tuning Job History",
+      "type": "table",
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16},
+      "targets": [
+        {
+          "expr": "neuroflow_queries_total",
+          "format": "table",
+          "instant": true
+        }
+      ]
+    }
+  ]
+}

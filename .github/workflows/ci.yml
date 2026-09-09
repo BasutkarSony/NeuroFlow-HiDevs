@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r backend/requirements.txt ruff mypy pytest pytest-cov pytest-asyncio
+      - run: ruff check backend/
+      - run: mypy tests/ --ignore-missing-imports
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r backend/requirements.txt pytest pytest-cov pytest-asyncio
+      - run: python -m pytest tests/unit/ -v --cov=backend --cov-report=xml
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install detect-secrets pip-audit
+      - run: pip-audit -r backend/requirements.txt --ignore-vuln PYSEC-2026-1325
+      - run: detect-secrets scan --baseline .secrets.baseline
+      - run: npm audit --prefix frontend --audit-level=high

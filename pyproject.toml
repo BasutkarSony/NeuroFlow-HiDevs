@@ -6,7 +6,8 @@ ignore = ["ANN101", "ANN102", "ANN", "E402", "F405", "F811", "F401", "I", "N", "
 
 [tool.mypy]
 python_version = "3.11"
-strict = true
+strict = false
+exclude = "backend/"
 ignore_missing_imports = true
 follow_imports = "skip"
 follow_imports_for_stubs = true

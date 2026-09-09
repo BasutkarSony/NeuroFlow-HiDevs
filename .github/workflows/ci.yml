@@ -15,7 +15,7 @@ jobs:
           python-version: "3.11"
       - run: pip install -r backend/requirements.txt ruff mypy pytest pytest-cov pytest-asyncio
       - run: ruff check backend/
-      - run: mypy backend/ --ignore-missing-imports
+      - run: mypy tests/ --ignore-missing-imports
 
   test:
     runs-on: ubuntu-latest

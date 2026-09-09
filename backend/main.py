@@ -1,11 +1,15 @@
 from contextlib import asynccontextmanager
 
-from monitoring.metrics import *
 from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import Response, Response
+from fastapi.responses import Response
+from monitoring.metrics import (
+    queries_total, ingestion_docs_total, llm_calls_total, circuit_breaker_trips_total,
+    retrieval_latency, generation_latency, llm_cost, eval_faithfulness, eval_overall,
+)
 from opentelemetry import trace
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+
 
 def _initialize_metrics():
     queries_total.labels(pipeline_id="default", status="success")
@@ -20,26 +24,25 @@ def _initialize_metrics():
     eval_overall.labels(pipeline_id="default")
 
 
-from config import get_settings
-from api.query import router as query_router, configure_provider
-from api.evaluations import router as evaluations_router
-from api.rating import router as rating_router
-from api.finetune import router as finetune_router
-from api.pipelines import router as pipelines_router
 from api.compare import router as compare_router
+from api.evaluations import router as evaluations_router
+from api.finetune import router as finetune_router
 from api.ingest import router as ingest_router
-from security.auth import (
-    TokenRequest,
-    authenticate_client,
-    get_current_user,
-    _create_access_token,
-)
+from api.pipelines import router as pipelines_router
+from api.query import configure_provider
+from api.query import router as query_router
+from api.rating import router as rating_router
+from config import get_settings
 from db.health import check_all
 from db.migrations import ensure_schema
 from db.pool import db_pool
 from providers.openai_provider import OpenAIProvider
-from providers.openai_provider import OpenAIProvider
-
+from security.auth import (
+    TokenRequest,
+    _create_access_token,
+    authenticate_client,
+    get_current_user,
+)
 
 settings = get_settings()
 tracer = trace.get_tracer(__name__)

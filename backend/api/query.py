@@ -3,23 +3,20 @@ import json
 import time
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
-from monitoring.metrics import queries_total, retrieval_latency, generation_latency, queue_depth
-from pydantic import BaseModel
-from sse_starlette.sse import EventSourceResponse
-
 from db.pool import db_pool
-from pipelines.generation.generator import RAGGenerator
-from pipelines.retrieval.pipeline import RetrievalPipeline
-from providers.openai_provider import OpenAIProvider
-from config import get_settings
+from fastapi import APIRouter, Depends, HTTPException
+from monitoring.metrics import queue_depth, retrieval_latency
+from pydantic import BaseModel
 from security.auth import ClientProfile, require_scope
 from security.prompt_injection import (
     classify_prompt_injection,
     detect_prompt_injection,
 )
 from security.validators import validate_query
+from sse_starlette.sse import EventSourceResponse
 
+from pipelines.generation.generator import RAGGenerator
+from pipelines.retrieval.pipeline import RetrievalPipeline
 
 router = APIRouter()
 
@@ -41,7 +38,6 @@ async def query(
     sanitized_query = validate_query(request.query)
 
     # Layer 1: detect and record, but do not reject.
-    injection_metadata = detect_prompt_injection(sanitized_query)
 
     # Layer 2: LLM classification for every user query.
     provider = _get_provider()
@@ -190,7 +186,6 @@ async def _run_stream(
             db=db,
         )
 
-        generation_start = time.perf_counter()
         async for event in generator.stream(
             query=query,
             context_result=context_result,

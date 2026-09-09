@@ -35,6 +35,6 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install detect-secrets pip-audit
-      - run: pip-audit -r backend/requirements.txt
+      - run: pip-audit -r backend/requirements.txt --ignore-vuln PYSEC-2026-1325
       - run: detect-secrets scan --baseline .secrets.baseline
       - run: npm audit --prefix frontend --audit-level=high

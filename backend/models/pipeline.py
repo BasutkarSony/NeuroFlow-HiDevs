@@ -1,4 +1,3 @@
-from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -21,6 +20,13 @@ class RetrievalConfig(BaseModel):
     top_k_after_rerank: int = Field(gt=0)
     query_expansion: bool
     metadata_filters_enabled: bool
+    candidate_k: int = Field(default=40, gt=0)
+    reranker_candidate_k: int = Field(default=40, gt=0)
+    fusion_k: int = Field(default=60, gt=0)
+    dense_weight: float = Field(default=1.0, ge=0)
+    sparse_weight: float = Field(default=1.0, ge=0)
+    metadata_weight: float = Field(default=1.0, ge=0)
+    metadata_k: int = Field(default=20, gt=0)
 
 
 class ModelRoutingConfig(BaseModel):

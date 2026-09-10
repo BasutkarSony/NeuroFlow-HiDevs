@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 
@@ -14,15 +14,24 @@ class RetrievalResult:
 def reciprocal_rank_fusion(
     result_lists: list[list[RetrievalResult]],
     k: int = 60,
+    weights: list[float] | None = None,
 ) -> list[RetrievalResult]:
     fused: dict[str, RetrievalResult] = {}
     scores: dict[str, float] = {}
 
-    for results in result_lists:
+    if weights is None:
+        weights = [1.0] * len(result_lists)
+
+    if len(weights) != len(result_lists):
+        raise ValueError("weights must match result_lists")
+
+    for list_index, results in enumerate(result_lists):
+        weight = max(float(weights[list_index]), 0.0)
+
         for rank, result in enumerate(results, start=1):
             scores[result.chunk_id] = (
                 scores.get(result.chunk_id, 0.0)
-                + 1.0 / (k + rank)
+                + weight / (k + rank)
             )
 
             if result.chunk_id not in fused:
@@ -34,7 +43,7 @@ def reciprocal_rank_fusion(
         reverse=True,
     )
 
-    for result in ranked:
-        result.score = scores[result.chunk_id]
-
-    return ranked
+    return [
+        replace(result, score=scores[result.chunk_id])
+        for result in ranked
+    ]

@@ -58,11 +58,106 @@ async def query(
 
     db = db_pool.get_pool()
 
-    retrieval = RetrievalPipeline(db=db)
+    pipeline_config = None
+
+    if request.pipeline_id:
+        pipeline_row = await db.fetchrow(
+            """
+            SELECT config
+            FROM pipelines
+            WHERE id = $1::uuid
+        """,
+            request.pipeline_id,
+        )
+
+        if pipeline_row is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Pipeline not found.",
+            )
+
+        pipeline_config = pipeline_row["config"]
+
+    retrieval_config = (
+        pipeline_config.get("retrieval", {})
+        if pipeline_config
+        else {}
+    )
+    generation_config = (
+        pipeline_config.get("generation", {})
+        if pipeline_config
+        else {}
+    )
+
+    candidate_k = int(
+        retrieval_config.get("candidate_k", 40)
+    )
+    reranker_candidate_k = int(
+        retrieval_config.get(
+            "reranker_candidate_k",
+            candidate_k,
+        )
+    )
+
+    retrieval = RetrievalPipeline(
+        db=db,
+        dense_k=int(
+            retrieval_config.get("dense_k", 20)
+        ),
+        sparse_k=int(
+            retrieval_config.get("sparse_k", 20)
+        ),
+        metadata_k=int(
+            retrieval_config.get("metadata_k", 20)
+        ),
+        candidate_k=candidate_k,
+        reranker_candidate_k=reranker_candidate_k,
+        query_expansion=bool(
+            retrieval_config.get(
+                "query_expansion",
+                True,
+            )
+        ),
+        fusion_k=int(
+            retrieval_config.get("fusion_k", 60)
+        ),
+        fusion_weights=[
+            float(
+                retrieval_config.get(
+                    "dense_weight",
+                    1.0,
+                )
+            ),
+            float(
+                retrieval_config.get(
+                    "sparse_weight",
+                    1.0,
+                )
+            ),
+            float(
+                retrieval_config.get(
+                    "metadata_weight",
+                    1.0,
+                )
+            ),
+        ],
+        token_budget=int(
+            generation_config.get(
+                "max_context_tokens",
+                4000,
+            )
+        ),
+    )
+
     retrieval_start = time.perf_counter()
     context_result = await retrieval.retrieve(
         request.query,
-        k=10,
+        k=int(
+            retrieval_config.get(
+                "top_k_after_rerank",
+                10,
+            )
+        ),
     )
     retrieval_latency.labels(strategy="hybrid").observe(
         time.perf_counter() - retrieval_start

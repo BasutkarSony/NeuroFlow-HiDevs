@@ -23,7 +23,7 @@ class TimeoutManager:
                 coro,
                 timeout=self.timeouts[task_type],
             )
-        except asyncio.TimeoutError as exc:
+        except TimeoutError as exc:
             if self.redis is not None:
                 await self.redis.incr(
                     f"timeouts:{task_type}"

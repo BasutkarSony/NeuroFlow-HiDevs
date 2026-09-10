@@ -24,7 +24,11 @@ router = APIRouter(prefix="/finetune")
 class FinetuneRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    base_model: str = Field(default="gpt-4o-mini", description="Base model used for fine-tuning.", examples=["gpt-4o-mini"])
+    base_model: str = Field(
+        default="gpt-4o-mini",
+        description="Base model used for fine-tuning.",
+        examples=["gpt-4o-mini"],
+    )
 
 
 @router.get("/training-data/preview")
@@ -54,10 +58,7 @@ async def preview_training_data():
 
     return {
         "count": len(rows),
-        "samples": [
-            _format_pair(dict(row))
-            for row in rows
-        ],
+        "samples": [_format_pair(dict(row)) for row in rows],
     }
 
 

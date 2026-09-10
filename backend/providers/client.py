@@ -1,4 +1,3 @@
-from collections import defaultdict
 
 from .base import ChatMessage, GenerationResult
 from .router import ModelRouter, RoutingCriteria

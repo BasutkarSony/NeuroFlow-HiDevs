@@ -11,8 +11,12 @@ security = HTTPBearer(auto_error=False)
 
 
 class TokenRequest(BaseModel):
-    client_id: str = Field(description="Configured API client identifier.", examples=["neuroflow-client"])
-    client_secret: str = Field(description="Configured API client secret.", examples=["your-client-secret"])
+    client_id: str = Field(
+        description="Configured API client identifier.", examples=["neuroflow-client"]
+    )
+    client_secret: str = Field(
+        description="Configured API client secret.", examples=["your-client-secret"]
+    )
 
 
 class ClientProfile(BaseModel):
@@ -45,10 +49,7 @@ def authenticate_client(
 ) -> ClientProfile | None:
     settings = get_settings()
 
-    if (
-        client_id != settings.auth_client_id
-        or client_secret != settings.auth_client_secret
-    ):
+    if client_id != settings.auth_client_id or client_secret != settings.auth_client_secret:
         return None
 
     return ClientProfile(

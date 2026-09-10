@@ -5,7 +5,6 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-
 SANDBOX_IMAGE = "neuroflow-document-sandbox"
 MEMORY_LIMIT = "256m"
 

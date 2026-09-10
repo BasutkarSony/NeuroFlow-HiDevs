@@ -21,11 +21,27 @@ class IngestRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     source_type: str = Field(description="Ingestion source type.", examples=["url"])
-    source_url: str | None = Field(default=None, description="URL to ingest when source_type is url.", examples=["https://example.com/doc.pdf"])
-    url: str | None = Field(default=None, description="Alias for source_url.", examples=["https://example.com/doc.pdf"])
-    filename: str | None = Field(default=None, description="Optional document filename.", examples=["document.pdf"])
-    pipeline_id: str | None = Field(default=None, description="Optional pipeline UUID.", examples=["00000000-0000-0000-0000-000000000001"])
-    metadata: dict[str, Any] = Field(default_factory=dict, description="Metadata attached to the ingestion.", examples=[{"department": "engineering"}])
+    source_url: str | None = Field(
+        default=None,
+        description="URL to ingest when source_type is url.",
+        examples=["https://example.com/doc.pdf"],
+    )
+    url: str | None = Field(
+        default=None, description="Alias for source_url.", examples=["https://example.com/doc.pdf"]
+    )
+    filename: str | None = Field(
+        default=None, description="Optional document filename.", examples=["document.pdf"]
+    )
+    pipeline_id: str | None = Field(
+        default=None,
+        description="Optional pipeline UUID.",
+        examples=["00000000-0000-0000-0000-000000000001"],
+    )
+    metadata: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Metadata attached to the ingestion.",
+        examples=[{"department": "engineering"}],
+    )
 
 
 def _sanitize_metadata(metadata: dict[str, Any]) -> dict[str, str]:
@@ -100,11 +116,7 @@ async def ingest(
 
         source_url = validate_document_url(source_url)
 
-        filename = (
-            sanitize_text(request.filename).strip()
-            if request.filename
-            else None
-        )
+        filename = sanitize_text(request.filename).strip() if request.filename else None
 
         metadata = _sanitize_metadata(request.metadata)
 

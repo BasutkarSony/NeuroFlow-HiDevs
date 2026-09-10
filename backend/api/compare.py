@@ -14,9 +14,16 @@ router = APIRouter(prefix="/pipelines")
 class CompareRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    query: str = Field(description="Query used for both pipelines.", examples=["Compare retrieval quality."])
-    pipeline_a_id: str = Field(description="UUID of the first pipeline.", examples=["00000000-0000-0000-0000-000000000001"])
-    pipeline_b_id: str = Field(description="UUID of the second pipeline.", examples=["00000000-0000-0000-0000-000000000002"])
+    query: str = Field(
+        description="Query used for both pipelines.", examples=["Compare retrieval quality."]
+    )
+    pipeline_a_id: str = Field(
+        description="UUID of the first pipeline.", examples=["00000000-0000-0000-0000-000000000001"]
+    )
+    pipeline_b_id: str = Field(
+        description="UUID of the second pipeline.",
+        examples=["00000000-0000-0000-0000-000000000002"],
+    )
 
 
 async def _run_pipeline(
@@ -63,9 +70,7 @@ async def _run_pipeline(
     # generation pipeline evolves. Keep the comparison contract stable.
     generation = f"Pipeline {pipeline['name']} received query: {query}"
 
-    total_latency = int(
-        (time.perf_counter() - started) * 1000
-    )
+    total_latency = int((time.perf_counter() - started) * 1000)
 
     await db.execute(
         """
@@ -97,11 +102,7 @@ async def _run_pipeline(
         "retrieval_latency_ms": 0,
         "total_latency_ms": total_latency,
         "chunks_used": 0,
-        "eval_score": (
-            float(evaluation["overall_score"])
-            if evaluation
-            else None
-        ),
+        "eval_score": (float(evaluation["overall_score"]) if evaluation else None),
     }
 
 

@@ -22,9 +22,17 @@ router = APIRouter()
 
 
 class QueryRequest(BaseModel):
-    query: str = Field(description="User query to retrieve and answer.", examples=["Summarize the document."])
-    pipeline_id: str | None = Field(default=None, description="Pipeline UUID used for retrieval and generation.", examples=["00000000-0000-0000-0000-000000000001"])
-    stream: bool = Field(default=False, description="Whether to return a streaming run ID.", examples=[True])
+    query: str = Field(
+        description="User query to retrieve and answer.", examples=["Summarize the document."]
+    )
+    pipeline_id: str | None = Field(
+        default=None,
+        description="Pipeline UUID used for retrieval and generation.",
+        examples=["00000000-0000-0000-0000-000000000001"],
+    )
+    stream: bool = Field(
+        default=False, description="Whether to return a streaming run ID.", examples=[True]
+    )
 
 
 _active_streams: dict[str, asyncio.Queue] = {}
@@ -78,20 +86,10 @@ async def query(
 
         pipeline_config = pipeline_row["config"]
 
-    retrieval_config = (
-        pipeline_config.get("retrieval", {})
-        if pipeline_config
-        else {}
-    )
-    generation_config = (
-        pipeline_config.get("generation", {})
-        if pipeline_config
-        else {}
-    )
+    retrieval_config = pipeline_config.get("retrieval", {}) if pipeline_config else {}
+    generation_config = pipeline_config.get("generation", {}) if pipeline_config else {}
 
-    candidate_k = int(
-        retrieval_config.get("candidate_k", 40)
-    )
+    candidate_k = int(retrieval_config.get("candidate_k", 40))
     reranker_candidate_k = int(
         retrieval_config.get(
             "reranker_candidate_k",
@@ -101,15 +99,9 @@ async def query(
 
     retrieval = RetrievalPipeline(
         db=db,
-        dense_k=int(
-            retrieval_config.get("dense_k", 20)
-        ),
-        sparse_k=int(
-            retrieval_config.get("sparse_k", 20)
-        ),
-        metadata_k=int(
-            retrieval_config.get("metadata_k", 20)
-        ),
+        dense_k=int(retrieval_config.get("dense_k", 20)),
+        sparse_k=int(retrieval_config.get("sparse_k", 20)),
+        metadata_k=int(retrieval_config.get("metadata_k", 20)),
         candidate_k=candidate_k,
         reranker_candidate_k=reranker_candidate_k,
         query_expansion=bool(
@@ -118,9 +110,7 @@ async def query(
                 True,
             )
         ),
-        fusion_k=int(
-            retrieval_config.get("fusion_k", 60)
-        ),
+        fusion_k=int(retrieval_config.get("fusion_k", 60)),
         fusion_weights=[
             float(
                 retrieval_config.get(
@@ -159,9 +149,7 @@ async def query(
             )
         ),
     )
-    retrieval_latency.labels(strategy="hybrid").observe(
-        time.perf_counter() - retrieval_start
-    )
+    retrieval_latency.labels(strategy="hybrid").observe(time.perf_counter() - retrieval_start)
 
     if request.stream:
         run_id = await _create_run(db, request)
@@ -307,7 +295,5 @@ def configure_provider(provider):
 
 def _get_provider():
     if _provider is None:
-        raise RuntimeError(
-            "No LLM provider configured for query generation."
-        )
+        raise RuntimeError("No LLM provider configured for query generation.")
     return _provider

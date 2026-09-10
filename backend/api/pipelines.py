@@ -1,14 +1,10 @@
 import json
-import statistics
-from typing import Any
-
-from fastapi import APIRouter, Depends, HTTPException, Query
 
 from db.pool import db_pool
+from fastapi import APIRouter, Depends, HTTPException, Query
 from models.pipeline import PipelineConfig
 from security.auth import ClientProfile, require_scope
 from security.validators import sanitize_text, validate_pipeline_name
-
 
 router = APIRouter(prefix="/pipelines")
 

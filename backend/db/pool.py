@@ -1,5 +1,4 @@
 import asyncpg
-
 from config import get_settings
 
 

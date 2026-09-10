@@ -18,12 +18,25 @@ class HybridRetriever:
         db,
         embedding_provider=None,
         query_processor=None,
+        dense_k: int = 20,
+        sparse_k: int = 20,
+        metadata_k: int = 20,
+        query_expansion: bool = True,
+        fusion_k: int = 60,
+        fusion_weights: list[float] | None = None,
     ):
         self.db = db
         self.embedding_provider = embedding_provider
         self.query_processor = (
-            query_processor or QueryProcessor()
+            query_processor or QueryProcessor(
+                enable_expansion=query_expansion
+            )
         )
+        self.dense_k = dense_k
+        self.sparse_k = sparse_k
+        self.metadata_k = metadata_k
+        self.fusion_k = fusion_k
+        self.fusion_weights = fusion_weights or [1.0, 1.0, 1.0]
 
     async def retrieve(
         self,
@@ -37,7 +50,7 @@ class HybridRetriever:
         dense_tasks = [
             self._dense_retrieval(
                 item,
-                k,
+                self.dense_k,
             )
             for item in queries
         ]
@@ -53,18 +66,19 @@ class HybridRetriever:
         sparse, metadata = await asyncio.gather(
             self._sparse_retrieval(
                 query,
-                k,
+                self.sparse_k,
             ),
             self._metadata_retrieval(
                 query,
                 processed,
-                k,
+                self.metadata_k,
             ),
         )
 
         return reciprocal_rank_fusion(
             [dense, sparse, metadata],
-            k=60,
+            k=self.fusion_k,
+            weights=self.fusion_weights,
         )
 
     async def _dense_retrieval(

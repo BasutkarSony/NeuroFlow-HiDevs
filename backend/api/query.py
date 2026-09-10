@@ -6,7 +6,7 @@ from typing import Any
 from db.pool import db_pool
 from fastapi import APIRouter, Depends, HTTPException
 from monitoring.metrics import queue_depth, retrieval_latency
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from security.auth import ClientProfile, require_scope
 from security.prompt_injection import (
     classify_prompt_injection,
@@ -22,9 +22,17 @@ router = APIRouter()
 
 
 class QueryRequest(BaseModel):
-    query: str
-    pipeline_id: str | None = None
-    stream: bool = False
+    query: str = Field(
+        description="User query to retrieve and answer.", examples=["Summarize the document."]
+    )
+    pipeline_id: str | None = Field(
+        default=None,
+        description="Pipeline UUID used for retrieval and generation.",
+        examples=["00000000-0000-0000-0000-000000000001"],
+    )
+    stream: bool = Field(
+        default=False, description="Whether to return a streaming run ID.", examples=[True]
+    )
 
 
 _active_streams: dict[str, asyncio.Queue] = {}
@@ -58,15 +66,90 @@ async def query(
 
     db = db_pool.get_pool()
 
-    retrieval = RetrievalPipeline(db=db)
+    pipeline_config = None
+
+    if request.pipeline_id:
+        pipeline_row = await db.fetchrow(
+            """
+            SELECT config
+            FROM pipelines
+            WHERE id = $1::uuid
+        """,
+            request.pipeline_id,
+        )
+
+        if pipeline_row is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Pipeline not found.",
+            )
+
+        pipeline_config = pipeline_row["config"]
+
+    retrieval_config = pipeline_config.get("retrieval", {}) if pipeline_config else {}
+    generation_config = pipeline_config.get("generation", {}) if pipeline_config else {}
+
+    candidate_k = int(retrieval_config.get("candidate_k", 40))
+    reranker_candidate_k = int(
+        retrieval_config.get(
+            "reranker_candidate_k",
+            candidate_k,
+        )
+    )
+
+    retrieval = RetrievalPipeline(
+        db=db,
+        dense_k=int(retrieval_config.get("dense_k", 20)),
+        sparse_k=int(retrieval_config.get("sparse_k", 20)),
+        metadata_k=int(retrieval_config.get("metadata_k", 20)),
+        candidate_k=candidate_k,
+        reranker_candidate_k=reranker_candidate_k,
+        query_expansion=bool(
+            retrieval_config.get(
+                "query_expansion",
+                True,
+            )
+        ),
+        fusion_k=int(retrieval_config.get("fusion_k", 60)),
+        fusion_weights=[
+            float(
+                retrieval_config.get(
+                    "dense_weight",
+                    1.0,
+                )
+            ),
+            float(
+                retrieval_config.get(
+                    "sparse_weight",
+                    1.0,
+                )
+            ),
+            float(
+                retrieval_config.get(
+                    "metadata_weight",
+                    1.0,
+                )
+            ),
+        ],
+        token_budget=int(
+            generation_config.get(
+                "max_context_tokens",
+                4000,
+            )
+        ),
+    )
+
     retrieval_start = time.perf_counter()
     context_result = await retrieval.retrieve(
         request.query,
-        k=10,
+        k=int(
+            retrieval_config.get(
+                "top_k_after_rerank",
+                10,
+            )
+        ),
     )
-    retrieval_latency.labels(strategy="hybrid").observe(
-        time.perf_counter() - retrieval_start
-    )
+    retrieval_latency.labels(strategy="hybrid").observe(time.perf_counter() - retrieval_start)
 
     if request.stream:
         run_id = await _create_run(db, request)
@@ -212,7 +295,5 @@ def configure_provider(provider):
 
 def _get_provider():
     if _provider is None:
-        raise RuntimeError(
-            "No LLM provider configured for query generation."
-        )
+        raise RuntimeError("No LLM provider configured for query generation.")
     return _provider

@@ -100,9 +100,7 @@ class AnthropicProvider(BaseLLMProvider):
                     **request,
                 )
 
-                latency_ms = (
-                    time.perf_counter() - start_time
-                ) * 1000
+                latency_ms = (time.perf_counter() - start_time) * 1000
 
                 input_tokens = response.usage.input_tokens
                 output_tokens = response.usage.output_tokens
@@ -114,17 +112,13 @@ class AnthropicProvider(BaseLLMProvider):
                         content += block.text
 
                 return GenerationResult(
-                    content=content,
-                    model=self.model,
-                    input_tokens=input_tokens,
-                    output_tokens=output_tokens,
-                    latency_ms=latency_ms,
-                    cost_usd=self._calculate_cost(
-                        input_tokens,
-                        output_tokens,
-                    ),
-                    finish_reason=response.stop_reason
-                    or "unknown",
+                    content,
+                    self.model,
+                    input_tokens,
+                    output_tokens,
+                    latency_ms,
+                    self._calculate_cost(input_tokens, output_tokens),
+                    response.stop_reason or "unknown",
                 )
 
             except RateLimitError as exc:
@@ -138,7 +132,7 @@ class AnthropicProvider(BaseLLMProvider):
                 )
 
                 if retry_after is None:
-                    retry_after = 2 ** attempt
+                    retry_after = 2**attempt
 
                 await asyncio.sleep(retry_after)
 
@@ -182,7 +176,7 @@ class AnthropicProvider(BaseLLMProvider):
                 )
 
                 if retry_after is None:
-                    retry_after = 2 ** attempt
+                    retry_after = 2**attempt
 
                 await asyncio.sleep(retry_after)
 
@@ -191,8 +185,7 @@ class AnthropicProvider(BaseLLMProvider):
         texts: list[str],
     ) -> list[list[float]]:
         raise NotImplementedError(
-            "Anthropic does not provide an embeddings API. "
-            "Use OpenAIProvider for embeddings."
+            "Anthropic does not provide an embeddings API. Use OpenAIProvider for embeddings."
         )
 
     @property

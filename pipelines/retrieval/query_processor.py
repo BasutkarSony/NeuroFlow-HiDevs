@@ -13,8 +13,9 @@ class ProcessedQuery:
 
 
 class QueryProcessor:
-    def __init__(self, llm=None):
+    def __init__(self, llm=None, enable_expansion: bool = True):
         self.llm = llm
+        self.enable_expansion = enable_expansion
 
     async def process(self, query: str) -> ProcessedQuery:
         expansions = await self._expand_query(query)
@@ -29,7 +30,7 @@ class QueryProcessor:
         )
 
     async def _expand_query(self, query: str) -> list[str]:
-        if self.llm is None:
+        if not self.enable_expansion or self.llm is None:
             return [query]
 
         prompt = (

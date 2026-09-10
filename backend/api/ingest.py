@@ -1,10 +1,9 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
-from pydantic import BaseModel, ConfigDict
-
+from pydantic import BaseModel, ConfigDict, Field
 from security.auth import ClientProfile, require_scope
 from security.secret_detector import redact_secrets
 from security.validators import (
@@ -12,7 +11,6 @@ from security.validators import (
     validate_document_url,
     validate_file_content,
 )
-
 
 router = APIRouter()
 
@@ -22,12 +20,28 @@ MAX_FILE_SIZE = 25 * 1024 * 1024  # 25 MiB
 class IngestRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    source_type: str
-    source_url: str | None = None
-    url: str | None = None
-    filename: str | None = None
-    pipeline_id: str | None = None
-    metadata: dict[str, Any] = {}
+    source_type: str = Field(description="Ingestion source type.", examples=["url"])
+    source_url: str | None = Field(
+        default=None,
+        description="URL to ingest when source_type is url.",
+        examples=["https://example.com/doc.pdf"],
+    )
+    url: str | None = Field(
+        default=None, description="Alias for source_url.", examples=["https://example.com/doc.pdf"]
+    )
+    filename: str | None = Field(
+        default=None, description="Optional document filename.", examples=["document.pdf"]
+    )
+    pipeline_id: str | None = Field(
+        default=None,
+        description="Optional pipeline UUID.",
+        examples=["00000000-0000-0000-0000-000000000001"],
+    )
+    metadata: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Metadata attached to the ingestion.",
+        examples=[{"department": "engineering"}],
+    )
 
 
 def _sanitize_metadata(metadata: dict[str, Any]) -> dict[str, str]:
@@ -52,7 +66,7 @@ def _queued_response(
         "status": "queued",
         "source_type": source_type,
         "pipeline_id": pipeline_id,
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(UTC).isoformat(),
     }
 
     if source_url is not None:
@@ -102,11 +116,7 @@ async def ingest(
 
         source_url = validate_document_url(source_url)
 
-        filename = (
-            sanitize_text(request.filename).strip()
-            if request.filename
-            else None
-        )
+        filename = sanitize_text(request.filename).strip() if request.filename else None
 
         metadata = _sanitize_metadata(request.metadata)
 

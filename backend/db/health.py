@@ -3,7 +3,6 @@ from urllib.parse import urlparse
 
 import asyncpg
 import redis.asyncio as redis
-
 from config import get_settings
 
 

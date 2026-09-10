@@ -80,36 +80,22 @@ class OpenAIProvider(BaseLLMProvider):
                     **kwargs,
                 )
 
-                latency_ms = (
-                    time.perf_counter() - start_time
-                ) * 1000
+                latency_ms = (time.perf_counter() - start_time) * 1000
 
                 usage = response.usage
 
-                input_tokens = (
-                    usage.prompt_tokens
-                    if usage
-                    else 0
-                )
+                input_tokens = usage.prompt_tokens if usage else 0
 
-                output_tokens = (
-                    usage.completion_tokens
-                    if usage
-                    else 0
-                )
+                output_tokens = usage.completion_tokens if usage else 0
 
                 return GenerationResult(
-                    content=response.choices[0].message.content or "",
-                    model=self.model,
-                    input_tokens=input_tokens,
-                    output_tokens=output_tokens,
-                    latency_ms=latency_ms,
-                    cost_usd=self._calculate_cost(
-                        input_tokens,
-                        output_tokens,
-                    ),
-                    finish_reason=response.choices[0].finish_reason
-                    or "unknown",
+                    response.choices[0].message.content or "",
+                    self.model,
+                    input_tokens,
+                    output_tokens,
+                    latency_ms,
+                    self._calculate_cost(input_tokens, output_tokens),
+                    response.choices[0].finish_reason or "unknown",
                 )
 
             except RateLimitError as exc:
@@ -123,7 +109,7 @@ class OpenAIProvider(BaseLLMProvider):
                 )
 
                 if retry_after is None:
-                    retry_after = 2 ** attempt
+                    retry_after = 2**attempt
 
                 await asyncio.sleep(retry_after)
 
@@ -165,7 +151,7 @@ class OpenAIProvider(BaseLLMProvider):
                 )
 
                 if retry_after is None:
-                    retry_after = 2 ** attempt
+                    retry_after = 2**attempt
 
                 await asyncio.sleep(retry_after)
 
@@ -173,20 +159,17 @@ class OpenAIProvider(BaseLLMProvider):
         self,
         texts: list[str],
     ) -> list[list[float]]:
-        embeddings = []
+        embeddings: list[list[float]] = []
 
         for start in range(0, len(texts), 100):
-            batch = texts[start:start + 100]
+            batch = texts[start : start + 100]
 
             response = await self.client.embeddings.create(
                 model="text-embedding-3-small",
                 input=batch,
             )
 
-            embeddings.extend(
-                item.embedding
-                for item in response.data
-            )
+            embeddings.extend(item.embedding for item in response.data)
 
         return embeddings
 

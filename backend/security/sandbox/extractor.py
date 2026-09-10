@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from pathlib import Path
+import logging
 
+from pathlib import Path
 
 INPUT_FILE = Path("/input/document")
 
@@ -42,4 +43,4 @@ if __name__ == "__main__":
     if not INPUT_FILE.is_file():
         raise SystemExit("Sandbox input document is missing")
 
-    print(extract(INPUT_FILE), end="")
+    logging.getLogger(__name__).info("%s", extract(INPUT_FILE))

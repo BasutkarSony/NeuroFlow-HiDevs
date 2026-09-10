@@ -4,8 +4,8 @@ from .circuit_breaker import (
     CircuitOpenError,
 )
 from .rate_limiter import (
-    TokenBucketRateLimiter,
     RateLimitExceeded,
+    TokenBucketRateLimiter,
 )
 from .timeout_manager import TimeoutManager
 

@@ -2,7 +2,7 @@ import json
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from db.pool import db_pool
 from pipelines.finetuning.extractor import (
@@ -24,7 +24,7 @@ router = APIRouter(prefix="/finetune")
 class FinetuneRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    base_model: str = "gpt-4o-mini"
+    base_model: str = Field(default="gpt-4o-mini", description="Base model used for fine-tuning.", examples=["gpt-4o-mini"])
 
 
 @router.get("/training-data/preview")

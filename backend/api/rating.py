@@ -1,14 +1,12 @@
+from db.pool import db_pool
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
-
-from db.pool import db_pool
-
 
 router = APIRouter()
 
 
 class RatingRequest(BaseModel):
-    rating: int = Field(ge=1, le=5)
+    rating: int = Field(ge=1, le=5, description="User rating from 1 to 5.", examples=[5])
 
 
 @router.patch("/runs/{run_id}/rating")

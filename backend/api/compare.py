@@ -3,7 +3,7 @@ import time
 from typing import Any
 
 from fastapi import APIRouter
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from db.pool import db_pool
 
@@ -14,9 +14,9 @@ router = APIRouter(prefix="/pipelines")
 class CompareRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    query: str
-    pipeline_a_id: str
-    pipeline_b_id: str
+    query: str = Field(description="Query used for both pipelines.", examples=["Compare retrieval quality."])
+    pipeline_a_id: str = Field(description="UUID of the first pipeline.", examples=["00000000-0000-0000-0000-000000000001"])
+    pipeline_b_id: str = Field(description="UUID of the second pipeline.", examples=["00000000-0000-0000-0000-000000000002"])
 
 
 async def _run_pipeline(

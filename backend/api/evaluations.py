@@ -33,3 +33,22 @@ async def evaluation_stream():
             await client.close()
 
     return EventSourceResponse(events(), ping=15)
+
+
+@router.get("/evaluations/{run_id}")
+async def get_evaluation(run_id: str):
+    from db.pool import db_pool
+    from fastapi import HTTPException
+    db = db_pool.get_pool()
+    row = await db.fetchrow("""
+        SELECT id, run_id, faithfulness, answer_relevance,
+               context_precision, context_recall, overall_score,
+               judge_model, user_rating, evaluated_at
+        FROM evaluations
+        WHERE run_id = $1::uuid
+        ORDER BY evaluated_at DESC
+        LIMIT 1
+    """, run_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Evaluation not found")
+    return dict(row)

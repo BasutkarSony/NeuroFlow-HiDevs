@@ -1,20 +1,18 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from config import get_settings
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
-from pydantic import BaseModel
-
-from config import get_settings
-
+from pydantic import BaseModel, Field
 
 security = HTTPBearer(auto_error=False)
 
 
 class TokenRequest(BaseModel):
-    client_id: str
-    client_secret: str
+    client_id: str = Field(description="Configured API client identifier.", examples=["neuroflow-client"])
+    client_secret: str = Field(description="Configured API client secret.", examples=["your-client-secret"])
 
 
 class ClientProfile(BaseModel):
@@ -25,7 +23,7 @@ class ClientProfile(BaseModel):
 def _create_access_token(client_id: str, scopes: list[str]) -> str:
     settings = get_settings()
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     expires_at = now + timedelta(seconds=settings.jwt_expire_seconds)
 
     payload = {

@@ -6,7 +6,7 @@ from typing import Any
 from db.pool import db_pool
 from fastapi import APIRouter, Depends, HTTPException
 from monitoring.metrics import queue_depth, retrieval_latency
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from security.auth import ClientProfile, require_scope
 from security.prompt_injection import (
     classify_prompt_injection,
@@ -22,9 +22,9 @@ router = APIRouter()
 
 
 class QueryRequest(BaseModel):
-    query: str
-    pipeline_id: str | None = None
-    stream: bool = False
+    query: str = Field(description="User query to retrieve and answer.", examples=["Summarize the document."])
+    pipeline_id: str | None = Field(default=None, description="Pipeline UUID used for retrieval and generation.", examples=["00000000-0000-0000-0000-000000000001"])
+    stream: bool = Field(default=False, description="Whether to return a streaming run ID.", examples=[True])
 
 
 _active_streams: dict[str, asyncio.Queue] = {}

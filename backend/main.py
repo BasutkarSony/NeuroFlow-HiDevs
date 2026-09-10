@@ -36,6 +36,7 @@ from config import get_settings
 from db.health import check_all
 from db.migrations import ensure_schema
 from db.pool import db_pool
+from jobs.retention import create_scheduler
 from providers.openai_provider import OpenAIProvider
 from security.auth import (
     TokenRequest,
@@ -61,9 +62,14 @@ async def lifespan(app: FastAPI):
         )
     )
 
-    yield
+    scheduler = create_scheduler(pool)
+    scheduler.start()
 
-    await db_pool.close()
+    try:
+        yield
+    finally:
+        scheduler.shutdown(wait=False)
+        await db_pool.close()
 
 
 _initialize_metrics()
@@ -165,3 +171,47 @@ app.include_router(finetune_router)
 app.include_router(pipelines_router)
 app.include_router(compare_router)
 app.include_router(ingest_router)
+
+
+
+_OPENAPI_META = {
+    "/": ("Admin", "Return basic API information."),
+    "/auth/token": ("Admin", "Issue a bearer access token using valid client credentials. Returns 401 for invalid credentials."),
+    "/health": ("Admin", "Check PostgreSQL, Redis, and MLflow health for readiness and incident diagnosis."),
+    "/metrics": ("Admin", "Expose Prometheus metrics for monitoring."),
+    "/ingest/file": ("Ingestion", "Queue multipart file ingestion. Files are limited to 25 MiB; invalid uploads return 400 or 413."),
+    "/ingest": ("Ingestion", "Queue URL or ingestion requests. Invalid requests return 400."),
+    "/query": ("Query", "Run a retrieval query. Streaming returns a run ID for the SSE stream; validation or prompt-injection failures return 400."),
+    "/evaluations": ("Evaluation", "Retrieve or stream evaluation results. A missing evaluation returns 404."),
+    "/pipelines/compare": ("Evaluation", "Compare two pipelines on the same query."),
+    "/pipelines": ("Admin", "Create, list, inspect, update, delete, and analyze pipelines."),
+    "/finetune": ("Fine-Tuning", "Preview training data and manage fine-tuning jobs."),
+    "/runs": ("Evaluation", "Submit and retrieve user ratings for pipeline runs."),
+}
+
+_original_openapi = app.openapi
+
+def _custom_openapi():
+    if getattr(app, "_task19_openapi", None):
+        return app._task19_openapi
+    schema = _original_openapi()
+    for _path, _operations in schema.get("paths", {}).items():
+        _matches = [k for k in _OPENAPI_META if _path == k or _path.startswith(k + "/")]
+        if not _matches:
+            continue
+        _key = max(_matches, key=len)
+        _tag, _description = _OPENAPI_META[_key]
+        for _method, _operation in _operations.items():
+            if not isinstance(_operation, dict):
+                continue
+            _operation["tags"] = [_tag]
+            _operation["description"] = _description
+            if not _operation.get("summary"):
+                _operation["summary"] = _path.strip("/").replace("/", " ").replace("_", " ").title() or "NeuroFlow API"
+            for _response in _operation.get("responses", {}).values():
+                if isinstance(_response, dict):
+                    _response["description"] = "Successful response."
+    app._task19_openapi = schema
+    return schema
+
+app.openapi = _custom_openapi

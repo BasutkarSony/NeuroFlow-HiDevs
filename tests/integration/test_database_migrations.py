@@ -1,6 +1,4 @@
 import os
-from pathlib import Path
-
 import asyncpg
 import pytest
 
@@ -13,7 +11,6 @@ async def test_fresh_schema_and_existing_schema_upgrade():
     if not database_url:
         pytest.skip("TEST_DATABASE_URL is not configured")
 
-    root = Path(__file__).resolve().parents[2]
     pool = await asyncpg.create_pool(database_url, min_size=1, max_size=2)
     assert pool is not None
 

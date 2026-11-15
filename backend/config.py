@@ -14,105 +14,39 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # Application
-    app_name: str = Field(
-        default="NeuroFlow",
-        description="Application name.",
-    )
-    app_env: str = Field(
-        default="development",
-        description="Application environment.",
-    )
-    debug: bool = Field(
-        default=False,
-        description="Enable FastAPI debug behavior.",
+    app_name: str = Field(default="NeuroFlow", description="Application name.")
+    app_env: str = Field(default="development", description="Application environment.")
+    debug: bool = Field(default=False, description="Enable FastAPI debug behavior.")
+
+    postgres_host: str = Field(default="localhost", description="PostgreSQL hostname.")
+    postgres_port: int = Field(default=5432, description="PostgreSQL port.")
+    postgres_db: str = Field(default="neuroflow", description="Application PostgreSQL database.")
+    postgres_user: str = Field(default="neuroflow", description="PostgreSQL username.")
+    postgres_password: str = Field(description="PostgreSQL password.")
+
+    redis_host: str = Field(default="localhost", description="Redis hostname.")
+    redis_port: int = Field(default=6379, description="Redis port.")
+    redis_password: str = Field(description="Redis authentication password.")
+
+    ingestion_storage_path: str = Field(
+        default="data/ingestion",
+        description="Shared persistent directory for uploaded ingestion source files.",
     )
 
-    # PostgreSQL
-    postgres_host: str = Field(
-        default="localhost",
-        description="PostgreSQL hostname.",
-    )
-    postgres_port: int = Field(
-        default=5432,
-        description="PostgreSQL port.",
-    )
-    postgres_db: str = Field(
-        default="neuroflow",
-        description="Application PostgreSQL database.",
-    )
-    postgres_user: str = Field(
-        default="neuroflow",
-        description="PostgreSQL username.",
-    )
-    postgres_password: str = Field(
-        description="PostgreSQL password.",
-    )
+    mlflow_host: str = Field(default="localhost", description="MLflow hostname.")
+    mlflow_port: int = Field(default=5000, description="MLflow port.")
+    otel_service_name: str = Field(default="neuroflow-api", description="OpenTelemetry service name.")
+    otel_exporter_otlp_endpoint: str = Field(default="http://localhost:4317", description="OTLP gRPC endpoint.")
+    llm_api_key: str | None = Field(default=None, description="LLM provider API key.")
 
-    # Redis
-    redis_host: str = Field(
-        default="localhost",
-        description="Redis hostname.",
-    )
-    redis_port: int = Field(
-        default=6379,
-        description="Redis port.",
-    )
-    redis_password: str = Field(
-        description="Redis authentication password.",
-    )
-
-    # MLflow
-    mlflow_host: str = Field(
-        default="localhost",
-        description="MLflow hostname.",
-    )
-    mlflow_port: int = Field(
-        default=5000,
-        description="MLflow server port.",
-    )
-
-    # OpenTelemetry
-    otel_service_name: str = Field(
-        default="neuroflow-api",
-        description="OpenTelemetry service name.",
-    )
-    otel_exporter_otlp_endpoint: str = Field(
-        default="http://localhost:4317",
-        description="OTLP gRPC endpoint.",
-    )
-
-    # LLM provider
-    llm_api_key: str | None = Field(
-        default=None,
-        description="LLM provider API key.",
-    )
-
-    # Security
-    jwt_secret_key: str = Field(
-        default="dev-only-change-this-secret",
-        description="Secret key used to sign JWT access tokens.",
-    )
-    jwt_algorithm: str = Field(
-        default="HS256",
-        description="JWT signing algorithm.",
-    )
-    jwt_expire_seconds: int = Field(
-        default=3600,
-        description="JWT access token lifetime in seconds.",
-    )
-    auth_client_id: str = Field(
-        default="neuroflow-client",
-        description="Configured API client identifier.",
-    )
-    auth_client_secret: str = Field(
-        default="dev-client-secret",
-        description="Configured API client secret.",
-    )
+    jwt_secret_key: str = Field(default="dev-only-change-this-secret", description="JWT signing secret.")
+    jwt_algorithm: str = Field(default="HS256", description="JWT signing algorithm.")
+    jwt_expire_seconds: int = Field(default=3600, description="JWT access token lifetime.")
+    auth_client_id: str = Field(default="neuroflow-client", description="Configured API client identifier.")
+    auth_client_secret: str = Field(default="dev-client-secret", description="Configured API client secret.")
 
     @property
     def postgres_dsn(self) -> str:
-        """Return the asyncpg PostgreSQL connection URL."""
         return (
             f"postgresql://{self.postgres_user}:{self.postgres_password}"
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
@@ -120,7 +54,6 @@ class Settings(BaseSettings):
 
     @property
     def redis_url(self) -> str:
-        """Return the authenticated Redis connection URL."""
         return (
             f"redis://:{self.redis_password}"
             f"@{self.redis_host}:{self.redis_port}/0"
@@ -128,11 +61,9 @@ class Settings(BaseSettings):
 
     @property
     def mlflow_url(self) -> str:
-        """Return the MLflow tracking server URL."""
         return f"http://{self.mlflow_host}:{self.mlflow_port}"
 
 
 @lru_cache
 def get_settings() -> Settings:
-    """Return the cached application settings instance."""
     return Settings()

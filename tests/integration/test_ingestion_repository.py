@@ -63,6 +63,18 @@ async def test_document_repository_persists_chunks_and_embeddings():
         assert document["chunk_count"] == 1
         assert chunk["content"] == "NeuroFlow ingestion integration test"
         assert chunk["embedded"] is True
+
+        owned_document = await repository.get_document_for_client(
+            document_id,
+            "integration-test",
+        )
+        foreign_document = await repository.get_document_for_client(
+            document_id,
+            "another-client",
+        )
+        assert owned_document is not None
+        assert str(owned_document["id"]) == document_id
+        assert foreign_document is None
     finally:
         if document_id:
             async with pool.acquire() as connection:

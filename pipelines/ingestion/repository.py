@@ -62,7 +62,7 @@ class DocumentRepository:
                     chunk_count = COALESCE($4, chunk_count)
                 WHERE id = $1
                 """,
-                document_id,
+                uuid.UUID(document_id),
                 status,
                 json.dumps(metadata or {}),
                 chunk_count,
@@ -80,7 +80,7 @@ class DocumentRepository:
             async with connection.transaction():
                 await connection.execute(
                     "DELETE FROM chunks WHERE document_id = $1",
-                    document_id,
+                    uuid.UUID(document_id),
                 )
                 for index, chunk in enumerate(chunks):
                     embedding = chunk.get("embedding")
@@ -97,7 +97,7 @@ class DocumentRepository:
                         )
                         VALUES ($1, $2, $3::vector, $4, $5, $6::jsonb)
                         """,
-                        document_id,
+                        uuid.UUID(document_id),
                         chunk["content"],
                         vector_value,
                         index,

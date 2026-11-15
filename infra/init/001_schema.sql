@@ -42,12 +42,16 @@ CREATE TABLE pipelines (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name TEXT UNIQUE NOT NULL,
     config JSONB NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    version INTEGER NOT NULL DEFAULT 1,
+    status VARCHAR(20) NOT NULL DEFAULT 'active',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE pipeline_runs (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    pipeline_id UUID NOT NULL REFERENCES pipelines(id),
+    pipeline_id UUID REFERENCES pipelines(id),
+    pipeline_version INTEGER,
     query TEXT NOT NULL,
     retrieved_chunk_ids UUID[],
     generation TEXT,
@@ -55,6 +59,7 @@ CREATE TABLE pipeline_runs (
     input_tokens INT,
     output_tokens INT,
     model_used TEXT,
+    metadata JSONB NOT NULL DEFAULT '{}',
     status VARCHAR(20) NOT NULL DEFAULT 'running',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -70,6 +75,7 @@ CREATE TABLE evaluations (
     overall_score FLOAT,
     judge_model TEXT,
     user_rating INT CHECK (user_rating BETWEEN 1 AND 5),
+    metadata JSONB NOT NULL DEFAULT '{}',
     evaluated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -98,3 +104,9 @@ CREATE TABLE finetune_jobs (
 );
 CREATE INDEX IF NOT EXISTS chunks_metadata_gin_idx
     ON chunks USING gin (metadata);
+
+CREATE INDEX IF NOT EXISTS pipeline_runs_pipeline_created_idx
+    ON pipeline_runs (pipeline_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS evaluations_run_evaluated_idx
+    ON evaluations (run_id, evaluated_at DESC);

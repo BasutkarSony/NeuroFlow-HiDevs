@@ -63,18 +63,16 @@ tracer = trace.get_tracer(__name__)
 async def lifespan(app: FastAPI):
     """Manage shared infrastructure resources."""
     pool = await db_pool.create()
-
-    await ensure_schema(pool)
-    configure_provider(
-        OpenAIProvider(
-            model="gpt-4o-mini",
-            api_key=settings.llm_api_key,
-        )
-    )
-
     scheduler = None
     ingestion_queue = None
     try:
+        await ensure_schema(pool)
+        configure_provider(
+            OpenAIProvider(
+                model="gpt-4o-mini",
+                api_key=settings.llm_api_key,
+            )
+        )
         ingestion_queue = await create_pool(
             RedisSettings(
                 host=settings.redis_host,

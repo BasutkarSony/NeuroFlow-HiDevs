@@ -1,3 +1,4 @@
+import hashlib
 import os
 import tempfile
 import uuid
@@ -138,7 +139,7 @@ async def test_ingestion_worker_processes_text_document_end_to_end():
         document_id = await repository.create_document(
             filename="worker-integration.txt",
             source_type="text",
-            content_hash=uuid.uuid4().hex,
+            content_hash=hashlib.sha256(content.encode("utf-8")).hexdigest(),
             pipeline_id=None,
             metadata={"client_id": "worker-integration-test"},
         )

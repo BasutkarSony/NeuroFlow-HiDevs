@@ -2,48 +2,93 @@ from pathlib import Path
 
 import asyncpg
 
-SCHEMA_FILE = (
-    Path(__file__).resolve().parents[2]
-    / "infra"
-    / "init"
-    / "001_schema.sql"
-)
+ROOT = Path(__file__).resolve().parents[2]
+SCHEMA_FILE = ROOT / "infra" / "init" / "001_schema.sql"
+MIGRATIONS_DIR = ROOT / "infra" / "migrations"
+MIGRATION_LOCK_ID = 726_104_202
 
 
-async def schema_exists(pool: asyncpg.Pool) -> bool:
-    """Check whether the core NeuroFlow schema has already been applied."""
-    async with pool.acquire() as connection:
-        result = await connection.fetchval(
-            """
-            SELECT EXISTS (
-                SELECT 1
-                FROM information_schema.tables
-                WHERE table_schema = 'public'
-                  AND table_name = 'documents'
-            )
-            """
+async def _schema_exists(connection: asyncpg.Connection) -> bool:
+    result = await connection.fetchval(
+        """
+        SELECT EXISTS (
+            SELECT 1
+            FROM information_schema.tables
+            WHERE table_schema = 'public'
+              AND table_name = 'documents'
         )
-
+        """
+    )
     return bool(result)
 
 
-async def apply_schema(pool: asyncpg.Pool) -> None:
-    """Apply the initial database schema when it is not already present."""
-    if await schema_exists(pool):
-        return
-
+async def _apply_initial_schema(connection: asyncpg.Connection) -> None:
     if not SCHEMA_FILE.exists():
-        raise FileNotFoundError(
-            f"Schema file not found: {SCHEMA_FILE}"
-        )
+        raise FileNotFoundError(f"Schema file not found: {SCHEMA_FILE}")
 
     schema_sql = SCHEMA_FILE.read_text(encoding="utf-8")
+    async with connection.transaction():
+        await connection.execute(schema_sql)
 
-    async with pool.acquire() as connection:
+
+async def _apply_migrations(connection: asyncpg.Connection) -> None:
+    await connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS schema_migrations (
+            version INTEGER PRIMARY KEY,
+            filename TEXT NOT NULL,
+            applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+        """
+    )
+
+    # The original schema was applied by Docker's init script or the
+    # previous ensure_schema implementation. Record it as migration 1.
+    await connection.execute(
+        """
+        INSERT INTO schema_migrations (version, filename)
+        VALUES (1, '001_initial_schema.sql')
+        ON CONFLICT (version) DO NOTHING
+        """
+    )
+
+    if not MIGRATIONS_DIR.exists():
+        return
+
+    migration_files = sorted(MIGRATIONS_DIR.glob("[0-9][0-9][0-9]_*.sql"))
+    for migration_file in migration_files:
+        version = int(migration_file.name.split("_", 1)[0])
+        already_applied = await connection.fetchval(
+            "SELECT EXISTS (SELECT 1 FROM schema_migrations WHERE version = $1)",
+            version,
+        )
+        if already_applied:
+            continue
+
+        migration_sql = migration_file.read_text(encoding="utf-8")
         async with connection.transaction():
-            await connection.execute(schema_sql)
+            await connection.execute(migration_sql)
+            await connection.execute(
+                """
+                INSERT INTO schema_migrations (version, filename)
+                VALUES ($1, $2)
+                """,
+                version,
+                migration_file.name,
+            )
 
 
 async def ensure_schema(pool: asyncpg.Pool) -> None:
-    """Ensure the NeuroFlow database schema is available."""
-    await apply_schema(pool)
+    """Create the initial schema and apply pending migrations exactly once."""
+    async with pool.acquire() as connection:
+        await connection.execute("SELECT pg_advisory_lock($1)", MIGRATION_LOCK_ID)
+        try:
+            if not await _schema_exists(connection):
+                await _apply_initial_schema(connection)
+
+            await _apply_migrations(connection)
+        finally:
+            await connection.execute(
+                "SELECT pg_advisory_unlock($1)",
+                MIGRATION_LOCK_ID,
+            )

@@ -140,7 +140,7 @@ cp .env.example .env
 docker compose -f infra/docker-compose.yml up --build
 ```
 
-Configure required secrets in `.env` before using protected API endpoints.
+Set `POSTGRES_PASSWORD` and `REDIS_PASSWORD` in `.env`. Configure an LLM provider key when embedding or image extraction is required, and replace development authentication secrets before production use.
 
 ## API Reference
 
@@ -169,8 +169,9 @@ The implemented FastAPI endpoints are listed below. Protected endpoints require 
 | GET | `/pipelines/{pipeline_id}/runs` | Yes | List pipeline runs |
 | GET | `/pipelines/{pipeline_id}/analytics` | Yes | Pipeline analytics |
 | POST | `/pipelines/compare` | Yes | Compare pipelines |
-| POST | `/ingest` | Yes | Queue ingestion |
-| POST | `/ingest/file` | Yes | Queue file ingestion |
+| POST | `/ingest` | Yes | Queue URL ingestion |
+| POST | `/ingest/file` | Yes | Queue file ingestion (25 MiB max) |
+| GET | `/ingest/{document_id}` | Yes | Retrieve tenant-scoped ingestion status |
 
 Full request and response contracts are documented in `docs/api-contracts.md`.
 
@@ -184,7 +185,7 @@ See sdk/examples/quickstart.py for the complete ingest-to-query streaming exampl
 
 Copy `.env.example` to `.env`.
 
-**Required:** `POSTGRES_PASSWORD`, `POSTGRES_URL`, `REDIS_PASSWORD`, `REDIS_URL`, at least one LLM provider credential, `JWT_SECRET_KEY`, and `PLUGIN_SECRETS_KEY`.
+**Required for Docker Compose:** `POSTGRES_PASSWORD` and `REDIS_PASSWORD`. Configure at least one LLM provider key for embedding and image ingestion. The API settings also support `JWT_SECRET_KEY`; development defaults must be replaced before production. `POSTGRES_URL` and `REDIS_URL` in `.env.example` are not consumed by the current backend settings.
 
 **Optional:** `MLFLOW_TRACKING_URI`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `SENTRY_DSN`, `ENVIRONMENT`, and `LOG_LEVEL`.
 
@@ -193,7 +194,9 @@ Never commit `.env` or provider credentials.
 ## Known Limitations
 
 - Retrieval and generation quality metrics cannot currently be measured because the required retrieval ground-truth dataset is absent.
-- The SDK ingestion method returns the queued ingestion record; a dedicated ingestion-status endpoint is not currently exposed.
+- The ingestion-status endpoint is available at `GET /ingest/{document_id}`; SDK polling support is not currently documented or verified.
+- Non-image documents can be processed without an embedding provider, but they will have no vector embeddings. Image ingestion requires a configured OpenAI provider.
+- Uploaded source files are retained in the shared ingestion volume; an automated retention policy is not yet defined.
 - Production TLS expects certificate files at the configured Nginx paths; trusted production certificates must replace development/testing certificates.
 - Fine-tuning depends on configured model/runtime infrastructure and available training data.
 - No live deployment URL is currently configured in the repository.
@@ -202,7 +205,7 @@ Never commit `.env` or provider credentials.
 
 1. Add and version a representative retrieval ground-truth dataset.
 2. Run the complete evaluation sprint and populate `evaluation/quality_final.json` with measured values.
-3. Add an ingestion-status API and SDK polling support.
+3. Add SDK polling support for the ingestion-status API.
 4. Expand integration and production deployment tests.
 5. Replace development TLS certificates with managed production certificates.
 

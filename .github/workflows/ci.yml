@@ -61,7 +61,7 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install -r backend/requirements.txt pytest pytest-asyncio
-      - run: python -m pytest tests/integration/test_database_migrations.py -v
+      - run: python -m pytest tests/integration/ -v
 
   security:
     runs-on: ubuntu-latest

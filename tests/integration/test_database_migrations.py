@@ -1,4 +1,5 @@
 import os
+
 import asyncpg
 import pytest
 
@@ -93,5 +94,13 @@ async def test_fresh_schema_and_existing_schema_upgrade():
                 "SELECT version FROM schema_migrations WHERE version = 2"
             )
             assert applied_version == 2
+
+        # Re-running startup migrations must be safe and leave version 2 applied.
+        await ensure_schema(pool)
+        async with pool.acquire() as connection:
+            migration_count = await connection.fetchval(
+                "SELECT COUNT(*) FROM schema_migrations WHERE version = 2"
+            )
+            assert migration_count == 1
     finally:
         await pool.close()

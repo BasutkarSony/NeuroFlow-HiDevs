@@ -1,5 +1,8 @@
 from contextlib import asynccontextmanager
 
+from arq import create_pool
+from arq.connections import RedisSettings
+
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import Response
 from monitoring.metrics import (
@@ -72,10 +75,20 @@ async def lifespan(app: FastAPI):
     scheduler = create_scheduler(pool)
     scheduler.start()
 
+    app.state.ingestion_queue = await create_pool(
+        RedisSettings(
+            host=settings.redis_host,
+            port=settings.redis_port,
+            password=settings.redis_password,
+            database=0,
+        )
+    )
+
     try:
         yield
     finally:
         scheduler.shutdown(wait=False)
+        await app.state.ingestion_queue.aclose()
         await db_pool.close()
 
 

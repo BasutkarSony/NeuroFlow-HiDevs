@@ -35,15 +35,25 @@ class Settings(BaseSettings):
 
     mlflow_host: str = Field(default="localhost", description="MLflow hostname.")
     mlflow_port: int = Field(default=5000, description="MLflow port.")
-    otel_service_name: str = Field(default="neuroflow-api", description="OpenTelemetry service name.")
-    otel_exporter_otlp_endpoint: str = Field(default="http://localhost:4317", description="OTLP gRPC endpoint.")
+    otel_service_name: str = Field(
+        default="neuroflow-api", description="OpenTelemetry service name."
+    )
+    otel_exporter_otlp_endpoint: str = Field(
+        default="http://localhost:4317", description="OTLP gRPC endpoint."
+    )
     llm_api_key: str | None = Field(default=None, description="LLM provider API key.")
 
-    jwt_secret_key: str = Field(default="dev-only-change-this-secret", description="JWT signing secret.")
+    jwt_secret_key: str = Field(
+        default="dev-only-change-this-secret", description="JWT signing secret."
+    )
     jwt_algorithm: str = Field(default="HS256", description="JWT signing algorithm.")
     jwt_expire_seconds: int = Field(default=3600, description="JWT access token lifetime.")
-    auth_client_id: str = Field(default="neuroflow-client", description="Configured API client identifier.")
-    auth_client_secret: str = Field(default="dev-client-secret", description="Configured API client secret.")
+    auth_client_id: str = Field(
+        default="neuroflow-client", description="Configured API client identifier."
+    )
+    auth_client_secret: str = Field(
+        default="dev-client-secret", description="Configured API client secret."
+    )
 
     @property
     def postgres_dsn(self) -> str:

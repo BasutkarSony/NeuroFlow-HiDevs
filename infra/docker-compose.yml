@@ -48,6 +48,9 @@ services:
       POSTGRES_HOST: postgres
       REDIS_HOST: redis
       MLFLOW_HOST: mlflow
+      INGESTION_STORAGE_PATH: /data/ingestion
+    volumes:
+      - ingestion_data:/data/ingestion
     depends_on:
       postgres:
         condition: service_healthy
@@ -59,12 +62,17 @@ services:
       - ../.env
 
   worker:
-    build: ../backend
-    command: python -m worker
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    command: python -m arq pipelines.ingestion.worker.WorkerSettings
     environment:
       POSTGRES_HOST: postgres
       REDIS_HOST: redis
       MLFLOW_HOST: mlflow
+      INGESTION_STORAGE_PATH: /data/ingestion
+    volumes:
+      - ingestion_data:/data/ingestion
     depends_on:
       postgres:
         condition: service_healthy
@@ -102,3 +110,4 @@ services:
 volumes:
   postgres_data:
   grafana_data:
+  ingestion_data:

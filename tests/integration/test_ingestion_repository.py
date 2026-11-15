@@ -93,5 +93,4 @@ async def test_arq_can_enqueue_ingestion_job():
         assert job is not None
         assert job.job_id == job_id
     finally:
-        await queue.delete_queue()
         await queue.aclose()

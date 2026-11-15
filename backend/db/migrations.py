@@ -6,20 +6,39 @@ ROOT = Path(__file__).resolve().parents[2]
 SCHEMA_FILE = ROOT / "infra" / "init" / "001_schema.sql"
 MIGRATIONS_DIR = ROOT / "infra" / "migrations"
 MIGRATION_LOCK_ID = 726_104_202
+REQUIRED_TABLES = {
+    "documents",
+    "chunks",
+    "pipelines",
+    "pipeline_runs",
+    "evaluations",
+    "training_pairs",
+    "finetune_jobs",
+}
 
 
 async def _schema_exists(connection: asyncpg.Connection) -> bool:
-    result = await connection.fetchval(
+    existing_tables = await connection.fetch(
         """
-        SELECT EXISTS (
-            SELECT 1
-            FROM information_schema.tables
-            WHERE table_schema = 'public'
-              AND table_name = 'documents'
-        )
-        """
+        SELECT table_name
+        FROM information_schema.tables
+        WHERE table_schema = 'public'
+          AND table_name = ANY($1::text[])
+        """,
+        list(REQUIRED_TABLES),
     )
-    return bool(result)
+    existing = {row["table_name"] for row in existing_tables}
+    if not existing:
+        return False
+
+    missing = REQUIRED_TABLES - existing
+    if missing:
+        missing_list = ", ".join(sorted(missing))
+        raise RuntimeError(
+            "Incomplete NeuroFlow database schema; missing tables: "
+            f"{missing_list}. Restore the missing tables before migrating."
+        )
+    return True
 
 
 async def _apply_initial_schema(connection: asyncpg.Connection) -> None:

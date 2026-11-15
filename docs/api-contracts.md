@@ -56,7 +56,7 @@ The `/health` endpoint does not require authentication.
 
 ## Purpose
 
-Accepts a file or web URL and starts asynchronous ingestion.
+Accepts a web URL as JSON or an uploaded file as multipart form data, persists the source and document record, and enqueues an ARQ background job. URL ingestion uses `POST /ingest`; file ingestion uses `POST /ingest/file`.
 
 Supported sources:
 
@@ -65,6 +65,8 @@ Supported sources:
 * Images
 * CSV
 * Web URLs
+
+File uploads are limited to 25 MiB. The API validates supported file content before persisting it. The worker extracts content, chunks it, optionally creates embeddings when an OpenAI provider key is configured, and persists chunks and document status.
 
 ## Authentication
 
@@ -89,7 +91,7 @@ URL ingestion uses JSON.
   "source_type": "url",
   "source_url": "https://example.com/document",
   "filename": null,
-  "pipeline_id": "default-rag",
+  "pipeline_id": null,
   "metadata": {
     "department": "hr",
     "document_type": "policy"
@@ -97,15 +99,17 @@ URL ingestion uses JSON.
 }
 ```
 
+The `pipeline_id`, when supplied, must be a UUID. URL ingestion accepts only `source_type: "url"`. File ingestion accepts multipart fields `source_type=file`, `filename`, optional `pipeline_id`, optional JSON-object `metadata`, and the file field.
+
 ### Request Fields
 
 | Field         | Type   | Required    | Description            |
 | ------------- | ------ | ----------- | ---------------------- |
-| `source_type` | string | Yes         | `file` or `url`        |
-| `source_url`  | string | Conditional | URL to ingest          |
-| `filename`    | string | Conditional | Uploaded filename      |
-| `pipeline_id` | string | No          | Pipeline configuration |
-| `metadata`    | object | No          | Source metadata        |
+| `source_type` | string | Yes | `url` for JSON requests; `file` for multipart uploads |
+| `source_url` | string | Yes for URL | URL to ingest |
+| `filename` | string | Yes for file; optional for URL | Display filename |
+| `pipeline_id` | UUID string | No | Optional pipeline identifier |
+| `metadata` | object | No | Source metadata |
 
 For file ingestion, `source_type`, `filename`, `pipeline_id`, and `metadata` are submitted as multipart fields together with the binary file.
 
@@ -115,25 +119,66 @@ For file ingestion, `source_type`, `filename`, `pipeline_id`, and `metadata` are
 
 ```json
 {
-  "ingestion_id": "ing_123456",
+  "ingestion_id": "9c6e3a3a-4f2e-4d4e-8f5c-8e0f6f7a4c12",
   "status": "queued",
-  "source_type": "file",
-  "pipeline_id": "default-rag",
-  "created_at": "2026-08-25T10:00:00Z"
+  "source_type": "pdf",
+  "filename": "policy.pdf"
 }
 ```
+
+A repeated content hash returns the existing ingestion ID with `status: "duplicate"`. The status resource is tenant-scoped to the authenticated client.
 
 ## Errors
 
 | Code                    | HTTP Status | Meaning                        |
 | ----------------------- | ----------: | ------------------------------ |
-| `INVALID_SOURCE_TYPE`   |         400 | Unsupported source type        |
-| `INVALID_URL`           |         400 | Invalid or inaccessible URL    |
-| `UNSUPPORTED_FILE_TYPE` |         400 | File format is not supported   |
-| `FILE_TOO_LARGE`        |         413 | File exceeds configured size   |
-| `PIPELINE_NOT_FOUND`    |         404 | Pipeline does not exist        |
-| `DUPLICATE_SOURCE`      |         409 | Source already exists          |
-| `INGESTION_FAILED`      |         500 | Ingestion could not be started |
+| `INVALID_SOURCE_TYPE` | 400 | Source type does not match the endpoint |
+| `INVALID_URL` | 400 | URL is missing or fails URL validation |
+| `INVALID_METADATA` | 400 | Multipart metadata is not a JSON object |
+| `FILE_TOO_LARGE` | 413 | File exceeds 25 MiB |
+| `INGESTION_QUEUE_UNAVAILABLE` | 503 | Source could not be queued; retry later |
+
+---
+
+# 2A. GET /ingest/{document_id}
+
+## Purpose
+
+Returns the persisted status of an ingestion request. The endpoint validates the UUID and only returns records belonging to the authenticated client. A missing record or a record owned by another client returns the same 404 response.
+
+## Path Parameter
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `document_id` | UUID string | Yes | The `ingestion_id` returned by the submission endpoint |
+
+## Response
+
+**HTTP 200 OK**
+
+```json
+{
+  "ingestion_id": "9c6e3a3a-4f2e-4d4e-8f5c-8e0f6f7a4c12",
+  "filename": "policy.pdf",
+  "source_type": "pdf",
+  "status": "complete",
+  "chunk_count": 12,
+  "metadata": {
+    "page_count": 4,
+    "embedding_count": 12
+  },
+  "created_at": "2026-11-15T10:00:00+00:00"
+}
+```
+
+The status is updated by the background worker (for example, `queued`, `processing`, `complete`, or `failed`). Only the safe metadata fields `source_url`, `page_count`, and `embedding_count` are returned.
+
+## Errors
+
+| Code | HTTP Status | Meaning |
+| --- | ---: | --- |
+| `INVALID_INGESTION_ID` | 400 | The path parameter is not a UUID |
+| `INGESTION_NOT_FOUND` | 404 | No ingestion belonging to this client exists |
 
 ---
 

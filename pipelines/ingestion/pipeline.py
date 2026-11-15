@@ -48,6 +48,17 @@ async def process_document(
             pages = await extract_image(file_bytes, provider)
         elif source_type == "csv":
             pages = extract_csv(file_bytes)
+        elif source_type == "text":
+            from pipelines.ingestion.extractors import ExtractedPage
+
+            pages = [
+                ExtractedPage(
+                    page_number=1,
+                    content=file_bytes.decode("utf-8"),
+                    content_type="text",
+                    metadata={"source_type": "text"},
+                )
+            ]
         elif source_type == "url":
             pages = await extract_url(file_bytes.decode("utf-8"))
         else:

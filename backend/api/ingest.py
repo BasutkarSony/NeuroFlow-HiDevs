@@ -242,3 +242,44 @@ async def ingest_file(
         metadata=_sanitize_metadata(metadata_value),
         client_id=current_user.client_id,
     )
+
+@router.get("/ingest/{document_id}")
+async def get_ingestion_status(
+    document_id: str,
+    current_user: ClientProfile = Depends(require_scope("ingest")),
+) -> dict[str, Any]:
+    try:
+        parsed_id = str(uuid.UUID(document_id))
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "INVALID_INGESTION_ID", "message": "ingestion_id must be a UUID"},
+        ) from exc
+
+    repository = DocumentRepository(db_pool.get_pool())
+    document = await repository.get_document_for_client(
+        parsed_id,
+        current_user.client_id,
+    )
+    if document is None:
+        # Do not reveal whether another client owns the document.
+        raise HTTPException(
+            status_code=404,
+            detail={"error": "INGESTION_NOT_FOUND", "message": "Ingestion not found"},
+        )
+
+    metadata = document["metadata"] or {}
+    safe_metadata = {
+        key: metadata[key]
+        for key in ("source_url", "page_count", "embedding_count")
+        if key in metadata
+    }
+    return {
+        "ingestion_id": str(document["id"]),
+        "filename": document["filename"],
+        "source_type": document["source_type"],
+        "status": document["status"],
+        "chunk_count": document["chunk_count"],
+        "metadata": safe_metadata,
+        "created_at": document["created_at"].isoformat(),
+    }

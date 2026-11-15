@@ -124,11 +124,17 @@ async def process_document(
         }
     except Exception as exc:
         logger.exception("Ingestion failed for document %s", document_id)
-        await db.update_document_status(
-            document_id,
-            "failed",
-            metadata={"error": str(exc)[:500]},
-        )
+        try:
+            await db.update_document_status(
+                document_id,
+                "failed",
+                metadata={"error": str(exc)[:500]},
+            )
+        except Exception:
+            logger.exception(
+                "Could not persist failed status for document %s",
+                document_id,
+            )
         raise
 
 

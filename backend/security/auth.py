@@ -4,7 +4,8 @@ from typing import Any
 from config import get_settings
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jose import JWTError, jwt
+import jwt
+from jwt.exceptions import InvalidTokenError
 from pydantic import BaseModel, Field
 
 security = HTTPBearer(auto_error=False)
@@ -90,12 +91,12 @@ async def get_current_user(
         scopes = payload.get("scopes")
 
         if not isinstance(client_id, str) or not isinstance(scopes, list):
-            raise JWTError("Invalid token payload")
+            raise InvalidTokenError("Invalid token payload")
 
         if not all(isinstance(scope, str) for scope in scopes):
-            raise JWTError("Invalid scopes")
+            raise InvalidTokenError("Invalid scopes")
 
-    except JWTError as exc:
+    except InvalidTokenError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",

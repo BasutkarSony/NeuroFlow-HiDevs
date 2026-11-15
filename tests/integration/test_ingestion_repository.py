@@ -1,5 +1,7 @@
 import os
+import tempfile
 import uuid
+from pathlib import Path
 
 import asyncpg
 import pytest
@@ -7,6 +9,7 @@ from arq import create_pool
 from arq.connections import RedisSettings
 
 from pipelines.ingestion.repository import DocumentRepository
+from pipelines.ingestion.worker import ingest_job
 
 
 @pytest.mark.asyncio
@@ -106,3 +109,73 @@ async def test_arq_can_enqueue_ingestion_job():
         assert job.job_id == job_id
     finally:
         await queue.aclose()
+
+@pytest.mark.asyncio
+async def test_ingestion_worker_processes_text_document_end_to_end():
+    database_url = os.getenv("TEST_DATABASE_URL")
+    if not database_url:
+        pytest.skip("TEST_DATABASE_URL is not configured")
+
+    pool = await asyncpg.create_pool(database_url, min_size=1, max_size=2)
+    repository = DocumentRepository(pool)
+    document_id = None
+    source_path = None
+    try:
+        content = (
+            "NeuroFlow is a document processing platform. "
+            "This integration test verifies that the worker handler extracts "
+            "plain text, chunks it, and persists the result in PostgreSQL."
+        )
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            suffix=".txt",
+            delete=False,
+        ) as source:
+            source.write(content)
+            source_path = Path(source.name)
+
+        document_id = await repository.create_document(
+            filename="worker-integration.txt",
+            source_type="text",
+            content_hash=uuid.uuid4().hex,
+            pipeline_id=None,
+            metadata={"client_id": "worker-integration-test"},
+        )
+        assert document_id is not None
+
+        result = await ingest_job(
+            {"db": repository, "provider": None, "tracer": None},
+            document_id,
+            str(source_path),
+            "text",
+        )
+
+        assert result["document_id"] == document_id
+        assert result["duplicate"] is False
+        assert result["chunk_count"] >= 1
+        assert result["embedding_count"] == 0
+
+        async with pool.acquire() as connection:
+            document = await connection.fetchrow(
+                "SELECT status, chunk_count FROM documents WHERE id = $1",
+                uuid.UUID(document_id),
+            )
+            chunks = await connection.fetch(
+                "SELECT content FROM chunks WHERE document_id = $1 ORDER BY chunk_index",
+                uuid.UUID(document_id),
+            )
+
+        assert document["status"] == "complete"
+        assert document["chunk_count"] == len(chunks)
+        assert content in " ".join(row["content"] for row in chunks)
+    finally:
+        if document_id:
+            async with pool.acquire() as connection:
+                await connection.execute(
+                    "DELETE FROM documents WHERE id = $1",
+                    uuid.UUID(document_id),
+                )
+        if source_path:
+            source_path.unlink(missing_ok=True)
+        await pool.close()

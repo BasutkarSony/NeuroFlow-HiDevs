@@ -1,4 +1,5 @@
 import json
+import uuid
 from typing import Any
 
 import asyncpg
@@ -33,7 +34,7 @@ class DocumentRepository:
                 filename,
                 source_type,
                 content_hash,
-                pipeline_id,
+                uuid.UUID(pipeline_id) if pipeline_id else None,
                 json.dumps(metadata),
             )
         return str(row["id"]) if row else None

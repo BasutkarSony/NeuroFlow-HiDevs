@@ -104,3 +104,21 @@ class DocumentRepository:
                         chunk["token_count"],
                         json.dumps(chunk.get("metadata", {})),
                     )
+
+    async def get_document_for_client(
+        self,
+        document_id: str,
+        client_id: str,
+    ):
+        async with self.pool.acquire() as connection:
+            return await connection.fetchrow(
+                """
+                SELECT id, filename, source_type, status, chunk_count,
+                       metadata, created_at
+                FROM documents
+                WHERE id = $1
+                  AND metadata->>'client_id' = $2
+                """,
+                uuid.UUID(document_id),
+                client_id,
+            )

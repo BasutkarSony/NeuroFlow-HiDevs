@@ -269,6 +269,8 @@ async def get_ingestion_status(
         )
 
     metadata = document["metadata"] or {}
+    if isinstance(metadata, str):
+        metadata = json.loads(metadata)
     safe_metadata = {
         key: metadata[key]
         for key in ("source_url", "page_count", "embedding_count")

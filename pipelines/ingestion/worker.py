@@ -1,4 +1,5 @@
 import asyncpg
+import os
 from arq.connections import RedisSettings
 from opentelemetry import trace
 
@@ -45,10 +46,11 @@ async def shutdown(ctx):
 
 class WorkerSettings:
     functions = [ingest_job]
+    # Keep module import side-effect free; runtime settings are loaded in startup().
     redis_settings = RedisSettings(
-        host=get_settings().redis_host,
-        port=get_settings().redis_port,
-        password=get_settings().redis_password,
+        host=os.getenv("REDIS_HOST", "localhost"),
+        port=int(os.getenv("REDIS_PORT", "6379")),
+        password=os.getenv("REDIS_PASSWORD") or None,
         database=0,
     )
     on_startup = startup

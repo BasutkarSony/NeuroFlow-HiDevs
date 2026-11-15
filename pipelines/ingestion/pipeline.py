@@ -25,170 +25,103 @@ async def process_document(
 ):
     start_time = time.perf_counter()
 
-    file_bytes = b""
+    try:
+        if not file_path:
+            raise ValueError("A persisted file path is required for ingestion")
 
-    if file_path:
-        file_bytes = Path(file_path).read_bytes()
+        file_bytes = await _read_file(file_path)
+        content_hash = hashlib.sha256(file_bytes).hexdigest()
+        existing = await db.get_document_by_hash(content_hash)
 
-    content_hash = hashlib.sha256(file_bytes).hexdigest()
+        if existing and str(existing["id"]) != document_id:
+            return {"document_id": str(existing["id"]), "duplicate": True}
 
-    existing = await db.get_document_by_hash(content_hash)
+        await db.update_document_status(document_id, "processing")
 
-    if existing:
+        if source_type == "pdf":
+            pages = extract_pdf(file_bytes)
+        elif source_type == "docx":
+            pages = extract_docx(file_bytes)
+        elif source_type in {"jpeg", "jpg", "png", "gif", "image"}:
+            if provider is None:
+                raise ValueError("Vision provider is required for image ingestion")
+            pages = await extract_image(file_bytes, provider)
+        elif source_type == "csv":
+            pages = extract_csv(file_bytes)
+        elif source_type == "url":
+            pages = await extract_url(file_bytes.decode("utf-8"))
+        else:
+            raise ValueError(f"Unsupported source type: {source_type}")
+
+        span_context = (
+            tracer.start_as_current_span("ingestion.process") if tracer else None
+        )
+        if span_context:
+            with span_context as span:
+                chunks = chunk_pages(pages)
+                span.set_attribute("document_id", document_id)
+                span.set_attribute("source_type", source_type)
+                span.set_attribute("page_count", len(pages))
+                span.set_attribute("chunk_count", len(chunks))
+        else:
+            chunks = chunk_pages(pages)
+
+        if provider is not None and chunks:
+            embeddings = await provider.embed([chunk["content"] for chunk in chunks])
+            if len(embeddings) != len(chunks):
+                raise RuntimeError("Embedding provider returned an unexpected result count")
+            for chunk, embedding in zip(chunks, embeddings):
+                chunk["embedding"] = embedding
+
+        for chunk in chunks:
+            chunk["token_count"] = len(chunk["content"].split())
+
+        await db.insert_chunks(document_id, chunks)
+        await db.update_document_status(
+            document_id,
+            "complete",
+            metadata={
+                "content_hash": content_hash,
+                "page_count": len(pages),
+                "chunk_count": len(chunks),
+                "embedding_count": sum(
+                    1 for chunk in chunks if chunk.get("embedding") is not None
+                ),
+            },
+            chunk_count=len(chunks),
+        )
+
+        duration_ms = (time.perf_counter() - start_time) * 1000
+        logger.info(
+            json.dumps(
+                {
+                    "event": "ingestion_complete",
+                    "document_id": document_id,
+                    "duration_ms": duration_ms,
+                    "chunks": len(chunks),
+                }
+            )
+        )
         return {
-            "document_id": existing["id"],
-            "duplicate": True,
+            "document_id": document_id,
+            "duplicate": False,
+            "page_count": len(pages),
+            "chunk_count": len(chunks),
+            "embedding_count": sum(
+                1 for chunk in chunks if chunk.get("embedding") is not None
+            ),
         }
-
-    await db.update_document_status(
-        document_id,
-        "processing",
-    )
-
-    if tracer:
-        span_context = tracer.start_as_current_span(
-            "ingestion.process"
+    except Exception as exc:
+        logger.exception("Ingestion failed for document %s", document_id)
+        await db.update_document_status(
+            document_id,
+            "failed",
+            metadata={"error": str(exc)[:500]},
         )
-    else:
-        span_context = None
-
-    if span_context:
-        with span_context as span:
-            result = await _extract_and_chunk(
-                document_id=document_id,
-                file_bytes=file_bytes,
-                source_type=source_type,
-                provider=provider,
-            )
-
-            _set_span_attributes(
-                span,
-                document_id,
-                source_type,
-                result,
-            )
-    else:
-        result = await _extract_and_chunk(
-            document_id=document_id,
-            file_bytes=file_bytes,
-            source_type=source_type,
-            provider=provider,
-        )
-
-    await db.update_document_status(
-        document_id,
-        "complete",
-        metadata={
-            "content_hash": content_hash,
-            "page_count": result["page_count"],
-            "chunk_count": result["chunk_count"],
-        },
-    )
-
-    duration_ms = (
-        time.perf_counter() - start_time
-    ) * 1000
-
-    logger.info(
-        json.dumps(
-            {
-                "event": "ingestion_complete",
-                "document_id": document_id,
-                "duration_ms": duration_ms,
-                "chunks": result["chunk_count"],
-                "tokens": result["tokens"],
-            }
-        )
-    )
-
-    return {
-        "document_id": document_id,
-        "duplicate": False,
-        **result,
-    }
+        raise
 
 
-async def _extract_and_chunk(
-    document_id: str,
-    file_bytes: bytes,
-    source_type: str,
-    provider=None,
-):
-    if source_type == "pdf":
-        pages = extract_pdf(file_bytes)
+async def _read_file(file_path: str) -> bytes:
+    import asyncio
 
-    elif source_type == "docx":
-        pages = extract_docx(file_bytes)
-
-    elif source_type in {"jpg", "jpeg", "png", "webp", "image"}:
-        if provider is None:
-            raise ValueError(
-                "Vision provider is required for images"
-            )
-
-        pages = await extract_image(
-            file_bytes,
-            provider,
-        )
-
-    elif source_type == "csv":
-        pages = extract_csv(file_bytes)
-
-    elif source_type == "url":
-        pages = await extract_url(
-            file_bytes.decode("utf-8")
-        )
-
-    else:
-        raise ValueError(
-            f"Unsupported source type: {source_type}"
-        )
-
-    chunks = chunk_pages(
-        pages,
-        embedding_provider=provider,
-    )
-
-    tokens = sum(
-        len(chunk["content"].split())
-        for chunk in chunks
-    )
-
-    return {
-        "page_count": len(pages),
-        "chunk_count": len(chunks),
-        "tokens": tokens,
-        "embedding_calls": 0,
-    }
-
-
-def _set_span_attributes(
-    span,
-    document_id,
-    source_type,
-    result,
-):
-    span.set_attribute(
-        "document_id",
-        document_id,
-    )
-
-    span.set_attribute(
-        "source_type",
-        source_type,
-    )
-
-    span.set_attribute(
-        "page_count",
-        result["page_count"],
-    )
-
-    span.set_attribute(
-        "chunk_count",
-        result["chunk_count"],
-    )
-
-    span.set_attribute(
-        "embedding_calls",
-        result["embedding_calls"],
-    )
+    return await asyncio.to_thread(Path(file_path).read_bytes)

@@ -57,6 +57,7 @@ async def _submit_ingestion(
     storage_dir = Path(settings.ingestion_storage_path)
     file_path = storage_dir / f"{document_uuid}.source"
     content_hash = hashlib.sha256(content).hexdigest()
+    document_id = None
 
     try:
         await asyncio.to_thread(storage_dir.mkdir, parents=True, exist_ok=True)
@@ -112,7 +113,9 @@ async def _submit_ingestion(
         raise
     except Exception as exc:
         try:
-            if "document_id" in locals() and document_id:
+            if document_id is None:
+                await asyncio.to_thread(file_path.unlink, missing_ok=True)
+            else:
                 repository = DocumentRepository(db_pool.get_pool())
                 await repository.update_document_status(
                     document_id,

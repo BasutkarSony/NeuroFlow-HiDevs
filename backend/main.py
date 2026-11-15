@@ -72,23 +72,26 @@ async def lifespan(app: FastAPI):
         )
     )
 
-    scheduler = create_scheduler(pool)
-    scheduler.start()
-
-    app.state.ingestion_queue = await create_pool(
-        RedisSettings(
-            host=settings.redis_host,
-            port=settings.redis_port,
-            password=settings.redis_password,
-            database=0,
-        )
-    )
-
+    scheduler = None
+    ingestion_queue = None
     try:
+        ingestion_queue = await create_pool(
+            RedisSettings(
+                host=settings.redis_host,
+                port=settings.redis_port,
+                password=settings.redis_password,
+                database=0,
+            )
+        )
+        app.state.ingestion_queue = ingestion_queue
+        scheduler = create_scheduler(pool)
+        scheduler.start()
         yield
     finally:
-        scheduler.shutdown(wait=False)
-        await app.state.ingestion_queue.aclose()
+        if scheduler is not None:
+            scheduler.shutdown(wait=False)
+        if ingestion_queue is not None:
+            await ingestion_queue.aclose()
         await db_pool.close()
 
 

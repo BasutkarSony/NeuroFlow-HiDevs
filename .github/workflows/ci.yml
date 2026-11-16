@@ -115,9 +115,9 @@ jobs:
           response="$(curl -fsS http://localhost:8000/ingest/file \
             -H "Authorization: Bearer $token" \
             -F 'source_type=file' \
-            -F 'filename=compose-smoke.txt' \
+            -F 'filename=compose-smoke.csv' \
             -F 'metadata={"source":"ci-compose-smoke"}' \
-            -F 'file=@/tmp/neuroflow-smoke.txt;type=text/plain')"
+            -F 'file=@/tmp/neuroflow-smoke.csv;type=text/csv')"
           ingestion_id="$(printf '%s' "$response" | python -c 'import json,sys; print(json.load(sys.stdin)["ingestion_id"])')"
 
           for attempt in $(seq 1 30); do

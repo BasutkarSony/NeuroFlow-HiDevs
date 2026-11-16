@@ -1,5 +1,7 @@
 import asyncpg
+import logging
 import os
+import uuid
 from arq.connections import RedisSettings
 from arq.worker import Retry
 from opentelemetry import trace
@@ -77,6 +79,41 @@ async def startup(ctx):
         if settings.llm_api_key
         else None
     )
+
+    # Recover requests interrupted between the database insert and Redis enqueue,
+    # plus documents left processing after ARQ's in-progress lease has expired.
+    recoverable = await ctx["db"].recoverable_ingestion_documents()
+    for document in recoverable:
+        metadata = document["metadata"] or {}
+        storage_path = metadata.get("storage_path")
+        client_id = metadata.get("client_id")
+        if not storage_path or not client_id:
+            await ctx["db"].update_document_status(
+                document["document_id"],
+                "failed",
+                metadata={"error": "Recovery metadata is missing storage_path or client_id"},
+            )
+            continue
+
+        job_id = (
+            f"ingest:{document['document_id']}"
+            if metadata.get("processing_started_at") is None
+            else f"ingest-recovery:{document['document_id']}:{uuid.uuid4().hex}"
+        )
+        try:
+            await ctx["redis"].enqueue_job(
+                "ingest_job",
+                document["document_id"],
+                storage_path,
+                document["source_type"],
+                client_id,
+                _job_id=job_id,
+            )
+        except Exception:
+            logging.getLogger(__name__).exception(
+                "Could not requeue recovered document %s",
+                document["document_id"],
+            )
 
 
 async def shutdown(ctx):

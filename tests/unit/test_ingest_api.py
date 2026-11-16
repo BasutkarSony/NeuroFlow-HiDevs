@@ -13,17 +13,19 @@ from backend.security.auth import ClientProfile
 class FakeRepository:
     def __init__(self, document_id="11111111-1111-4111-8111-111111111111"):
         self.document_id = document_id
+        self.create_result = document_id
+        self.existing_document_id = document_id
         self.created = []
         self.status_updates = []
         self.lookup_calls = []
 
     async def create_document(self, **kwargs):
         self.created.append(kwargs)
-        return self.document_id
+        return self.create_result
 
     async def get_document_by_hash(self, content_hash, client_id):
         self.lookup_calls.append((content_hash, client_id))
-        return {"id": self.document_id, "status": "queued"}
+        return {"id": self.existing_document_id, "status": "queued"}
 
     async def update_document_status(self, document_id, status, metadata=None):
         self.status_updates.append((document_id, status, metadata))
@@ -158,3 +160,78 @@ async def test_ingestion_status_does_not_expose_another_tenants_document(monkeyp
 
     assert exc_info.value.status_code == 404
     assert exc_info.value.detail["error"] == "INGESTION_NOT_FOUND"
+
+
+
+@pytest.mark.asyncio
+async def test_duplicate_file_submission_returns_existing_tenant_document(api_dependencies):
+    repository, queue, storage_dir = api_dependencies
+    repository.create_result = None
+    repository.existing_document_id = "22222222-2222-4222-8222-222222222222"
+    upload = UploadFile(filename="duplicate.txt", file=io.BytesIO(b"same content"))
+
+    result = await ingest_api.ingest_file(
+        fake_request(queue),
+        source_type="file",
+        filename="duplicate.txt",
+        pipeline_id=None,
+        metadata="{}",
+        file=upload,
+        current_user=ClientProfile(client_id="tenant-a", scopes=["ingest"]),
+    )
+
+    assert result["status"] == "duplicate"
+    assert result["duplicate"] is True
+    assert result["ingestion_id"] == repository.existing_document_id
+    assert repository.lookup_calls[0][1] == "tenant-a"
+    assert queue.jobs == []
+    assert list(storage_dir.iterdir()) == []
+
+
+@pytest.mark.asyncio
+async def test_invalid_file_content_is_rejected_before_persistence(api_dependencies, monkeypatch):
+    repository, queue, storage_dir = api_dependencies
+
+    def reject_file(filename, content, content_type):
+        raise HTTPException(status_code=400, detail="Invalid file content")
+
+    monkeypatch.setattr(ingest_api, "validate_file_content", reject_file)
+    upload = UploadFile(filename="malicious.txt", file=io.BytesIO(b"not a valid document"))
+
+    with pytest.raises(HTTPException) as exc_info:
+        await ingest_api.ingest_file(
+            fake_request(queue),
+            source_type="file",
+            filename="malicious.txt",
+            pipeline_id=None,
+            metadata="{}",
+            file=upload,
+            current_user=ClientProfile(client_id="tenant-a", scopes=["ingest"]),
+        )
+
+    assert exc_info.value.status_code == 400
+    assert repository.created == []
+    assert queue.jobs == []
+    assert list(storage_dir.iterdir()) == []
+
+
+@pytest.mark.asyncio
+async def test_file_ingestion_rejects_invalid_metadata_before_persistence(api_dependencies):
+    repository, queue, storage_dir = api_dependencies
+    upload = UploadFile(filename="notes.txt", file=io.BytesIO(b"content"))
+
+    with pytest.raises(HTTPException) as exc_info:
+        await ingest_api.ingest_file(
+            fake_request(queue),
+            source_type="file",
+            filename="notes.txt",
+            pipeline_id=None,
+            metadata='["not", "an", "object"]',
+            file=upload,
+            current_user=ClientProfile(client_id="tenant-a", scopes=["ingest"]),
+        )
+
+    assert exc_info.value.status_code == 400
+    assert repository.created == []
+    assert queue.jobs == []
+    assert list(storage_dir.iterdir()) == []

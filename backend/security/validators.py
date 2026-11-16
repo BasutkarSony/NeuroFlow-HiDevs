@@ -60,8 +60,25 @@ def resolve_document_url(url: str) -> tuple[str, str, int, list[tuple[int, int, 
             detail="Invalid document URL",
         )
 
-    hostname = parsed.hostname.rstrip(".").lower()
-    port = parsed.port or (443 if parsed.scheme == "https" else 80)
+    raw_hostname = parsed.hostname.rstrip(".").lower()
+    try:
+        hostname = ipaddress.ip_address(raw_hostname).compressed
+    except ValueError:
+        try:
+            hostname = raw_hostname.encode("idna").decode("ascii")
+        except UnicodeError as exc:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid document URL hostname",
+            ) from exc
+
+    try:
+        port = parsed.port or (443 if parsed.scheme == "https" else 80)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid document URL port",
+        ) from exc
 
     try:
         records = socket.getaddrinfo(

@@ -116,6 +116,7 @@ async def test_arq_can_enqueue_ingestion_job():
             str(uuid.uuid4()),
             "/tmp/neuroflow-integration-source",
             "text",
+            "integration-test",
             _job_id=job_id,
         )
         assert job is not None

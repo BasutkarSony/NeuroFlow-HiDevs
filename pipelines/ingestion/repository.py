@@ -159,8 +159,8 @@ class DocumentRepository:
                         ) < NOW() - INTERVAL '16 minutes'
                     )
                     ORDER BY created_at
-                    FOR UPDATE SKIP LOCKED
                     LIMIT 100
+                    FOR UPDATE SKIP LOCKED
                     """
                 )
                 if rows:

@@ -79,6 +79,18 @@ async def test_document_repository_persists_chunks_and_embeddings():
         assert owned_document is not None
         assert str(owned_document["id"]) == document_id
         assert foreign_document is None
+
+        owned_duplicate = await repository.get_document_by_hash(
+            content_hash,
+            "integration-test",
+        )
+        foreign_duplicate = await repository.get_document_by_hash(
+            content_hash,
+            "another-client",
+        )
+        assert owned_duplicate is not None
+        assert str(owned_duplicate["id"]) == document_id
+        assert foreign_duplicate is None
     finally:
         if document_id:
             async with pool.acquire() as connection:

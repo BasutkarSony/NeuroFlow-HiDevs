@@ -126,7 +126,7 @@ For file ingestion, `source_type`, `filename`, `pipeline_id`, and `metadata` are
 }
 ```
 
-A repeated content hash returns the existing ingestion ID with `status: "duplicate"`. The status resource is tenant-scoped to the authenticated client.
+A repeated content hash returns `status: "duplicate"`. The existing ingestion ID is included only when the existing document belongs to the authenticated client; for a cross-client duplicate, `ingestion_id` is null to avoid exposing another tenant's resource identifier. The status resource is tenant-scoped to the authenticated client.
 
 ## Errors
 

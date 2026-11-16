@@ -92,6 +92,7 @@ async def _submit_ingestion(
             document_id,
             str(file_path),
             source_type,
+            client_id,
             _job_id=f"ingest:{document_id}",
         )
         if job is None:

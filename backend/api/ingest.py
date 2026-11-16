@@ -78,7 +78,7 @@ async def _submit_ingestion(
 
         if document_id is None:
             await asyncio.to_thread(file_path.unlink, missing_ok=True)
-            existing = await repository.get_document_by_hash(content_hash)
+            existing = await repository.get_document_by_hash(content_hash, client_id)
             return {
                 "ingestion_id": str(existing["id"]) if existing else None,
                 "status": "duplicate",

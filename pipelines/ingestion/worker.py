@@ -1,6 +1,7 @@
-import asyncpg
 import logging
 import os
+
+import asyncpg
 from arq.connections import RedisSettings
 from arq.cron import cron
 from arq.worker import Retry
@@ -53,32 +54,12 @@ async def ingest_job(ctx, document_id: str, file_path: str, source_type: str, cl
                 },
             )
         except Exception:
-            # Preserve the original ingestion exception; a later reconciliation
-            # pass can identify records left in processing state.
-            import logging
-
+            # Preserve the original ingestion exception; periodic recovery can
+            # identify records left in processing state.
             logging.getLogger(__name__).exception(
                 "Could not persist final failure for document %s", document_id
             )
         raise
-
-
-async def startup(ctx):
-    settings = get_settings()
-    pool = await asyncpg.create_pool(
-        dsn=settings.postgres_dsn,
-        min_size=1,
-        max_size=5,
-        command_timeout=60,
-    )
-    ctx["pool"] = pool
-    ctx["db"] = DocumentRepository(pool)
-    ctx["tracer"] = trace.get_tracer("neuroflow.ingestion.worker")
-    ctx["provider"] = (
-        OpenAIProvider(model="gpt-4o-mini", api_key=settings.llm_api_key)
-        if settings.llm_api_key
-        else None
-    )
 
 
 async def recover_ingestion_documents(ctx):

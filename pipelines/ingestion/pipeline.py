@@ -123,19 +123,10 @@ async def process_document(
                 1 for chunk in chunks if chunk.get("embedding") is not None
             ),
         }
-    except Exception as exc:
-        logger.exception("Ingestion failed for document %s", document_id)
-        try:
-            await db.update_document_status(
-                document_id,
-                "failed",
-                metadata={"error": str(exc)[:500]},
-            )
-        except Exception:
-            logger.exception(
-                "Could not persist failed status for document %s",
-                document_id,
-            )
+    except Exception:
+        # The ARQ handler owns retry/final-failure state transitions. Marking a
+        # transient attempt as failed here would expose a false terminal status.
+        logger.exception("Ingestion attempt failed for document %s", document_id)
         raise
 
 

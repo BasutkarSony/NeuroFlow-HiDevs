@@ -65,7 +65,11 @@ class DocumentRepository:
                 """
                 UPDATE documents
                 SET status = $2,
-                    metadata = metadata || $3::jsonb,
+                    metadata = metadata || $3::jsonb || CASE
+                        WHEN $2 = 'processing'
+                        THEN jsonb_build_object('processing_started_at', NOW())
+                        ELSE '{}'::jsonb
+                    END,
                     chunk_count = COALESCE($4, chunk_count)
                 WHERE id = $1
                 """,

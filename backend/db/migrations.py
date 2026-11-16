@@ -2,7 +2,20 @@ from pathlib import Path
 
 import asyncpg
 
-ROOT = Path(__file__).resolve().parents[2]
+
+def _find_project_root() -> Path:
+    """Find the repository root in both source and container layouts."""
+    current_file = Path(__file__).resolve()
+    for parent in current_file.parents:
+        if (parent / "infra" / "init" / "001_schema.sql").is_file():
+            return parent
+    raise FileNotFoundError(
+        "Could not locate infra/init/001_schema.sql relative to "
+        f"{current_file}"
+    )
+
+
+ROOT = _find_project_root()
 SCHEMA_FILE = ROOT / "infra" / "init" / "001_schema.sql"
 MIGRATIONS_DIR = ROOT / "infra" / "migrations"
 MIGRATION_LOCK_ID = 726_104_202

@@ -22,6 +22,7 @@ async def test_document_repository_persists_chunks_and_embeddings():
     pool = await asyncpg.create_pool(database_url, min_size=1, max_size=2)
     assert pool is not None
     document_id = None
+    other_tenant_document_id = None
     try:
         repository = DocumentRepository(pool)
         content_hash = uuid.uuid4().hex
@@ -80,6 +81,24 @@ async def test_document_repository_persists_chunks_and_embeddings():
         assert str(owned_document["id"]) == document_id
         assert foreign_document is None
 
+        same_tenant_duplicate = await repository.create_document(
+            filename="same-tenant-duplicate.txt",
+            source_type="text",
+            content_hash=content_hash,
+            pipeline_id=None,
+            metadata={"client_id": "integration-test"},
+        )
+        assert same_tenant_duplicate is None
+
+        other_tenant_document_id = await repository.create_document(
+            filename="other-tenant-copy.txt",
+            source_type="text",
+            content_hash=content_hash,
+            pipeline_id=None,
+            metadata={"client_id": "another-client"},
+        )
+        assert other_tenant_document_id is not None
+
         owned_duplicate = await repository.get_document_by_hash(
             content_hash,
             "integration-test",
@@ -90,14 +109,16 @@ async def test_document_repository_persists_chunks_and_embeddings():
         )
         assert owned_duplicate is not None
         assert str(owned_duplicate["id"]) == document_id
-        assert foreign_duplicate is None
+        assert foreign_duplicate is not None
+        assert str(foreign_duplicate["id"]) == other_tenant_document_id
     finally:
-        if document_id:
-            async with pool.acquire() as connection:
-                await connection.execute(
-                    "DELETE FROM documents WHERE id = $1",
-                    uuid.UUID(document_id),
-                )
+        async with pool.acquire() as connection:
+            for cleanup_id in (document_id, other_tenant_document_id):
+                if cleanup_id:
+                    await connection.execute(
+                        "DELETE FROM documents WHERE id = $1",
+                        uuid.UUID(cleanup_id),
+                    )
         await pool.close()
 
 

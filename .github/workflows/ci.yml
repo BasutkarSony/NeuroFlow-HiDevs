@@ -98,15 +98,16 @@ jobs:
             sleep 5
           done
 
-          token_response="$(curl -sS -w '\\nHTTP_STATUS:%{http_code}' http://localhost:8000/auth/token -H 'Content-Type: application/json' -d '{"client_id":"neuroflow-client","client_secret":"ci-client-secret"}')"
+          token_response="$(curl -sS -w 'HTTP_STATUS:%{http_code}' http://localhost:8000/auth/token -H 'Content-Type: application/json' -d '{"client_id":"neuroflow-client","client_secret":"ci-client-secret"}')"
           token_status="${token_response##*HTTP_STATUS:}"
-          token_body="${token_response%$'\\n'HTTP_STATUS:*}"
+          token_body="${token_response%HTTP_STATUS:*}"
           if [ "$token_status" != "200" ]; then
             echo "Token endpoint returned HTTP $token_status: $token_body"
             docker compose -f infra/docker-compose.yml logs --no-color api postgres redis mlflow
             exit 1
           fi
           token="$(printf '%s' "$token_body" | python -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')"
+
 
 
 

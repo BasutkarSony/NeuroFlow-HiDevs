@@ -224,3 +224,64 @@ async def test_ingestion_worker_processes_text_document_end_to_end():
         if source_path:
             source_path.unlink(missing_ok=True)
         await pool.close()
+
+
+@pytest.mark.asyncio
+async def test_repository_claims_stale_processing_documents_for_recovery():
+    database_url = os.getenv("TEST_DATABASE_URL")
+    if not database_url:
+        pytest.skip("TEST_DATABASE_URL is not configured")
+
+    pool = await asyncpg.create_pool(database_url, min_size=1, max_size=2)
+    document_id = None
+    try:
+        repository = DocumentRepository(pool)
+        document_id = await repository.create_document(
+            filename="stale-worker-document.txt",
+            source_type="text",
+            content_hash=uuid.uuid4().hex,
+            pipeline_id=None,
+            metadata={
+                "client_id": "recovery-integration-test",
+                "storage_path": "/tmp/recovery-integration-test.txt",
+            },
+        )
+        assert document_id is not None
+
+        async with pool.acquire() as connection:
+            await connection.execute(
+                """
+                UPDATE documents
+                SET status = 'processing',
+                    created_at = NOW() - INTERVAL '20 minutes',
+                    metadata = metadata || jsonb_build_object(
+                        'processing_started_at',
+                        (NOW() - INTERVAL '20 minutes')::text
+                    )
+                WHERE id = $1
+                """,
+                uuid.UUID(document_id),
+            )
+
+        recovered = await repository.recoverable_ingestion_documents()
+        assert len(recovered) == 1
+        assert recovered[0]["document_id"] == document_id
+        assert recovered[0]["source_type"] == "text"
+        assert recovered[0]["metadata"]["client_id"] == "recovery-integration-test"
+        assert recovered[0]["metadata"]["storage_path"] == "/tmp/recovery-integration-test.txt"
+        assert recovered[0]["metadata"]["processing_started_at"]
+
+        async with pool.acquire() as connection:
+            status_value = await connection.fetchval(
+                "SELECT status FROM documents WHERE id = $1",
+                uuid.UUID(document_id),
+            )
+        assert status_value == "queued"
+    finally:
+        if document_id:
+            async with pool.acquire() as connection:
+                await connection.execute(
+                    "DELETE FROM documents WHERE id = $1",
+                    uuid.UUID(document_id),
+                )
+        await pool.close()

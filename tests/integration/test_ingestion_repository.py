@@ -47,6 +47,8 @@ async def test_document_repository_persists_chunks_and_embeddings():
                 }
             ],
         )
+        # Exercise the processing transition that records the worker lease timestamp.
+        await repository.update_document_status(document_id, "processing")
         await repository.update_document_status(
             document_id,
             "complete",

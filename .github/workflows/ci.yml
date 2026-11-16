@@ -65,6 +65,11 @@ jobs:
 
   container-build:
     runs-on: ubuntu-latest
+    env:
+      POSTGRES_PASSWORD: ci-postgres-password
+      REDIS_PASSWORD: ci-redis-password
+      JWT_SECRET_KEY: ci-jwt-secret-change-this
+      AUTH_CLIENT_SECRET: ci-client-secret
     steps:
       - uses: actions/checkout@v4
       - name: Provide Compose-required local environment

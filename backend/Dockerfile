@@ -4,13 +4,17 @@ COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 FROM python:3.11-slim AS runtime
-RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
+RUN apt-get update \
+    && apt-get upgrade -y \
+    && apt-get install -y --no-install-recommends tesseract-ocr \
+    && rm -rf /var/lib/apt/lists/*
 RUN groupadd -r neuroflow && useradd -r -g neuroflow neuroflow
 WORKDIR /app
 COPY --from=deps /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=deps /usr/local/bin /usr/local/bin
 COPY backend/ .
 COPY pipelines/ ./pipelines/
+COPY infra/ ./infra/
 RUN chown -R neuroflow:neuroflow /app
 USER neuroflow
 EXPOSE 8000

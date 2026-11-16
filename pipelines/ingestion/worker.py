@@ -9,11 +9,12 @@ from pipelines.ingestion.repository import DocumentRepository
 from providers.openai_provider import OpenAIProvider
 
 
-async def ingest_job(ctx, document_id: str, file_path: str, source_type: str):
+async def ingest_job(ctx, document_id: str, file_path: str, source_type: str, client_id: str):
     return await process_document(
         document_id=document_id,
         file_path=file_path,
         source_type=source_type,
+        client_id=client_id,
         db=ctx["db"],
         provider=ctx.get("provider"),
         tracer=ctx.get("tracer"),

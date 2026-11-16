@@ -43,31 +43,9 @@ def validate_pipeline_name(name: str) -> str:
     return name
 
 
-def _is_private_or_local(hostname: str) -> bool:
-    """Return True for localhost or private/reserved IP addresses."""
-    hostname = hostname.strip().lower().rstrip(".")
-
-    if hostname in {"localhost", "localhost.localdomain"}:
-        return True
-
-    try:
-        address = ipaddress.ip_address(hostname)
-    except ValueError:
-        return False
-
-    return (
-        address.is_private
-        or address.is_loopback
-        or address.is_link_local
-        or address.is_reserved
-        or address.is_unspecified
-    )
-
-
-def validate_document_url(url: str) -> str:
-    """Validate a document URL and reject obvious SSRF targets."""
+def resolve_document_url(url: str) -> tuple[str, str, int, list[tuple[int, int, int, str]]]:
+    """Validate a document URL and return the exact public IPs to pin for its connection."""
     url = url.strip()
-
     parsed = urlparse(url)
 
     if parsed.scheme not in {"http", "https"}:
@@ -76,25 +54,19 @@ def validate_document_url(url: str) -> str:
             detail="Document URL must use http or https",
         )
 
-    if not parsed.hostname:
+    if not parsed.hostname or parsed.username or parsed.password:
         raise HTTPException(
             status_code=400,
             detail="Invalid document URL",
         )
 
-    hostname = parsed.hostname
+    hostname = parsed.hostname.rstrip(".").lower()
+    port = parsed.port or (443 if parsed.scheme == "https" else 80)
 
-    if _is_private_or_local(hostname):
-        raise HTTPException(
-            status_code=400,
-            detail="Document URL targets a private or local address",
-        )
-
-    # Resolve hostnames so that domains resolving to private IPs are blocked.
     try:
-        addresses = socket.getaddrinfo(
+        records = socket.getaddrinfo(
             hostname,
-            parsed.port or (443 if parsed.scheme == "https" else 80),
+            port,
             type=socket.SOCK_STREAM,
         )
     except socket.gaierror as exc:
@@ -103,16 +75,43 @@ def validate_document_url(url: str) -> str:
             detail="Unable to resolve document URL hostname",
         ) from exc
 
-    for address in addresses:
-        resolved_ip = address[4][0]
-
-        if _is_private_or_local(resolved_ip):
+    pinned: list[tuple[int, int, int, str]] = []
+    seen: set[tuple[int, int, int, str]] = set()
+    for family, socktype, proto, _canonname, sockaddr in records:
+        try:
+            address = ipaddress.ip_address(sockaddr[0])
+        except ValueError as exc:
             raise HTTPException(
                 status_code=400,
-                detail="Document URL resolves to a private or local address",
+                detail="Document URL resolved to an invalid address",
+            ) from exc
+
+        # Require globally routable unicast addresses. This also rejects
+        # loopback, private, link-local, multicast, reserved and unspecified IPs.
+        if not address.is_global or address.is_multicast:
+            raise HTTPException(
+                status_code=400,
+                detail="Document URL resolves to a non-public address",
             )
 
-    return url
+        entry = (family, socktype, proto, str(address))
+        if entry not in seen:
+            seen.add(entry)
+            pinned.append(entry)
+
+    if not pinned:
+        raise HTTPException(
+            status_code=400,
+            detail="Document URL did not resolve to a public address",
+        )
+
+    return url, hostname, port, pinned
+
+
+def validate_document_url(url: str) -> str:
+    """Validate a document URL and reject private, local, or non-public targets."""
+    validated_url, _hostname, _port, _addresses = resolve_document_url(url)
+    return validated_url
 
 
 # File signatures ("magic bytes") for supported document types.

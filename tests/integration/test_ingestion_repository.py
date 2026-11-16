@@ -69,6 +69,15 @@ async def test_document_repository_persists_chunks_and_embeddings():
         assert chunk["content"] == "NeuroFlow ingestion integration test"
         assert chunk["embedded"] is True
 
+        # Reprocessing to an empty extraction must remove old chunks as well.
+        await repository.insert_chunks(document_id, [])
+        async with pool.acquire() as connection:
+            remaining_chunks = await connection.fetchval(
+                "SELECT COUNT(*) FROM chunks WHERE document_id = $1",
+                uuid.UUID(document_id),
+            )
+        assert remaining_chunks == 0
+
         owned_document = await repository.get_document_for_client(
             document_id,
             "integration-test",

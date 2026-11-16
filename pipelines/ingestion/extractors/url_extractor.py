@@ -54,14 +54,18 @@ async def extract_url(url: str) -> list[ExtractedPage]:
             follow_redirects=False,
             timeout=30.0,
         ) as client:
-            # Do not follow robots.txt redirects implicitly either.
-            await asyncio.to_thread(validate_document_url, robots_url)
-            robots_response = await client.get(robots_url)
-
-            if robots_response.status_code < 400 and robots_response.status_code not in REDIRECT_STATUSES:
-                robots.parse(robots_response.text.splitlines())
+            # Follow robots.txt redirects only after validating every hop.
+            # A 4xx response means no robots policy is available; a 5xx or
+            # network failure is treated as unreachable and fails closed.
+            try:
+                robots_response = await _get_with_safe_redirects(client, robots_url)
+            except httpx.HTTPStatusError as exc:
+                if 400 <= exc.response.status_code < 500:
+                    robots = None
+                else:
+                    raise RuntimeError("robots.txt is temporarily unavailable") from exc
             else:
-                robots = None
+                robots.parse(robots_response.text.splitlines())
 
             if robots is not None and not robots.can_fetch("NeuroFlow", url):
                 raise PermissionError(f"robots.txt disallows fetching {url}")

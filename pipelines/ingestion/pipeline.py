@@ -19,6 +19,7 @@ async def process_document(
     document_id: str,
     file_path: str | None,
     source_type: str,
+    client_id: str,
     db,
     provider=None,
     tracer=None,
@@ -31,7 +32,7 @@ async def process_document(
 
         file_bytes = await _read_file(file_path)
         content_hash = hashlib.sha256(file_bytes).hexdigest()
-        existing = await db.get_document_by_hash(content_hash)
+        existing = await db.get_document_by_hash(content_hash, client_id)
 
         if existing and str(existing["id"]) != document_id:
             return {"document_id": str(existing["id"]), "duplicate": True}

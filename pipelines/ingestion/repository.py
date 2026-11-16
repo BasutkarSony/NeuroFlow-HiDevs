@@ -64,9 +64,9 @@ class DocumentRepository:
             await connection.execute(
                 """
                 UPDATE documents
-                SET status = $2,
+                SET status = ($2::text)::varchar,
                     metadata = metadata || $3::jsonb || CASE
-                        WHEN $2 = 'processing'
+                        WHEN $2::text = 'processing'
                         THEN jsonb_build_object('processing_started_at', NOW())
                         ELSE '{}'::jsonb
                     END,

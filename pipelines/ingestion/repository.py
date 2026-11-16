@@ -39,11 +39,18 @@ class DocumentRepository:
             )
         return str(row["id"]) if row else None
 
-    async def get_document_by_hash(self, content_hash: str):
+    async def get_document_by_hash(self, content_hash: str, client_id: str):
+        """Return a duplicate only when it belongs to the requesting client."""
         async with self.pool.acquire() as connection:
             return await connection.fetchrow(
-                "SELECT id, status FROM documents WHERE content_hash = $1",
+                """
+                SELECT id, status
+                FROM documents
+                WHERE content_hash = $1
+                  AND metadata->>'client_id' = $2
+                """,
                 content_hash,
+                client_id,
             )
 
     async def update_document_status(

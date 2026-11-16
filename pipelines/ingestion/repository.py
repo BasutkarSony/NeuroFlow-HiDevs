@@ -126,3 +126,57 @@ class DocumentRepository:
                 uuid.UUID(document_id),
                 client_id,
             )
+
+    async def recoverable_ingestion_documents(self):
+        """
+        Claim queued documents whose enqueue may have been interrupted and
+        processing documents whose ARQ worker lease should have expired.
+        A transaction-scoped advisory lock prevents concurrent workers from
+        claiming the same recovery batch.
+        """
+        async with self.pool.acquire() as connection:
+            async with connection.transaction():
+                await connection.execute(
+                    "SELECT pg_advisory_xact_lock(hashtext('neuroflow-ingestion-recovery'))"
+                )
+                rows = await connection.fetch(
+                    """
+                    SELECT id, source_type, metadata
+                    FROM documents
+                    WHERE (
+                        status = 'queued'
+                        AND created_at < NOW() - INTERVAL '30 seconds'
+                    )
+                    OR (
+                        status = 'processing'
+                        AND COALESCE(
+                            NULLIF(metadata->>'processing_started_at', '')::timestamptz,
+                            created_at
+                        ) < NOW() - INTERVAL '16 minutes'
+                    )
+                    ORDER BY created_at
+                    FOR UPDATE SKIP LOCKED
+                    LIMIT 100
+                    """
+                )
+                if rows:
+                    await connection.execute(
+                        """
+                        UPDATE documents
+                        SET status = 'queued'
+                        WHERE id = ANY($1::uuid[])
+                        """,
+                        [row["id"] for row in rows],
+                    )
+                return [
+                    {
+                        "document_id": str(row["id"]),
+                        "source_type": row["source_type"],
+                        "metadata": (
+                            json.loads(row["metadata"])
+                            if isinstance(row["metadata"], str)
+                            else row["metadata"]
+                        ),
+                    }
+                    for row in rows
+                ]

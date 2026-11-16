@@ -10,6 +10,7 @@ from arq import create_pool
 from arq.connections import RedisSettings
 from arq.worker import Worker
 
+from backend.db.migrations import ensure_schema
 from pipelines.ingestion.repository import DocumentRepository
 from pipelines.ingestion.worker import ingest_job
 
@@ -35,6 +36,9 @@ async def test_arq_worker_consumes_queued_job_and_persists_document():
     )
 
     try:
+        # Each integration test must prepare its own schema; test order is not guaranteed.
+        await ensure_schema(database)
+
         with tempfile.NamedTemporaryFile(
             mode="w",
             encoding="utf-8",

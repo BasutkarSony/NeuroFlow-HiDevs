@@ -140,7 +140,7 @@ cp .env.example .env
 docker compose -f infra/docker-compose.yml up --build
 ```
 
-Set `POSTGRES_PASSWORD` and `REDIS_PASSWORD` in `.env`. Configure an LLM provider key when embedding or image extraction is required, and replace development authentication secrets before production use. Redis uses append-only persistence (`appendfsync everysec`) on the `redis_data` volume and `noeviction` so memory pressure cannot silently evict queued jobs; if Redis reaches its memory limit, new writes fail and the API reports queue submission failure instead.
+Set `POSTGRES_PASSWORD` and `REDIS_PASSWORD` in `.env`. Configure an LLM provider key when embedding or image extraction is required, and replace development authentication secrets before production use. Redis uses append-only persistence (`appendfsync everysec`) on the `redis_data` volume and `noeviction` so memory pressure cannot silently evict queued jobs; if Redis reaches its memory limit, new writes fail and the API reports queue submission failure instead. The Redis, API, and worker Compose services use `restart: unless-stopped` so they recover after process/container exits.
 
 ## API Reference
 

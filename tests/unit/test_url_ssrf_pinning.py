@@ -60,8 +60,9 @@ def test_resolve_document_url_rejects_mixed_public_and_private_dns_answers(monke
         fake_getaddrinfo,
     )
 
-    with pytest.raises(HTTPException, match="non-public address"):
+    with pytest.raises(HTTPException) as exc_info:
         resolve_document_url("https://example.com/document")
+    assert exc_info.value.detail == "Document URL resolves to a non-public address"
 
 
 @pytest.mark.asyncio

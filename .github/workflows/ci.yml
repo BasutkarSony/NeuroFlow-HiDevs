@@ -69,11 +69,65 @@ jobs:
       - uses: actions/checkout@v4
       - name: Provide Compose-required local environment
         run: |
-          printf 'POSTGRES_PASSWORD=ci-postgres-password\nREDIS_PASSWORD=ci-redis-password\n' > .env
+          printf 'POSTGRES_PASSWORD=ci-postgres-password\nREDIS_PASSWORD=ci-redis-password\nJWT_SECRET_KEY=ci-jwt-secret-change-this\nAUTH_CLIENT_SECRET=ci-client-secret\n' > .env
       - name: Validate Docker Compose configuration
         run: docker compose -f infra/docker-compose.yml config --quiet
       - name: Build API and worker image
         run: docker build -f backend/Dockerfile -t neuroflow-api:ci .
+      - name: Start infrastructure, API, and worker
+        run: docker compose -f infra/docker-compose.yml up -d postgres redis mlflow api worker
+      - name: Verify health and file ingestion through ARQ worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 60); do
+            health="$(curl -fsS http://localhost:8000/health || true)"
+            if [ -n "$health" ] && HEALTH_JSON="$health" python -c 'import json,os,sys; d=json.loads(os.environ["HEALTH_JSON"]); sys.exit(0 if d.get("status") == "ok" and all(d.get("checks", {}).values()) else 1)'; then
+              break
+            fi
+            if [ "$attempt" -eq 60 ]; then
+              docker compose -f infra/docker-compose.yml logs
+              echo "API did not become healthy in time"
+              exit 1
+            fi
+            sleep 5
+          done
+
+          token="$(curl -fsS http://localhost:8000/auth/token \
+            -H 'Content-Type: application/json' \
+            -d '{"client_id":"neuroflow-client","client_secret":"ci-client-secret"}' \
+            | python -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')"
+
+          printf 'NeuroFlow compose smoke test: durable ingestion worker path.\n' > /tmp/neuroflow-smoke.txt
+          response="$(curl -fsS http://localhost:8000/ingest/file \
+            -H "Authorization: Bearer $token" \
+            -F 'source_type=file' \
+            -F 'filename=compose-smoke.txt' \
+            -F 'metadata={"source":"ci-compose-smoke"}' \
+            -F 'file=@/tmp/neuroflow-smoke.txt;type=text/plain')"
+          ingestion_id="$(printf '%s' "$response" | python -c 'import json,sys; print(json.load(sys.stdin)["ingestion_id"])')"
+
+          for attempt in $(seq 1 30); do
+            status="$(curl -fsS "http://localhost:8000/ingest/$ingestion_id" -H "Authorization: Bearer $token")"
+            state="$(printf '%s' "$status" | python -c 'import json,sys; print(json.load(sys.stdin)["status"])')"
+            if [ "$state" = "complete" ]; then
+              printf '%s' "$status" | python -c 'import json,sys; d=json.load(sys.stdin); assert (d.get("chunk_count") or 0) > 0, d; print("Compose ingestion smoke test passed:", d["ingestion_id"], "chunks:", d["chunk_count"])'
+              exit 0
+            fi
+            if [ "$state" = "failed" ]; then
+              echo "$status"
+              docker compose -f infra/docker-compose.yml logs worker api
+              exit 1
+            fi
+            sleep 5
+          done
+
+          docker compose -f infra/docker-compose.yml logs worker api
+          echo "Document did not complete ingestion in time"
+          exit 1
+      - name: Stop Compose stack
+        if: always()
+        run: docker compose -f infra/docker-compose.yml down -v
 
   security:
     runs-on: ubuntu-latest

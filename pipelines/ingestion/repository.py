@@ -80,9 +80,6 @@ class DocumentRepository:
         document_id: str,
         chunks: list[dict[str, Any]],
     ) -> None:
-        if not chunks:
-            return
-
         async with self.pool.acquire() as connection:
             async with connection.transaction():
                 await connection.execute(

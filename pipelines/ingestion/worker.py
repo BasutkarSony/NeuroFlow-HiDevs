@@ -2,6 +2,7 @@ import asyncpg
 import logging
 import os
 from arq.connections import RedisSettings
+from arq.cron import cron
 from arq.worker import Retry
 from opentelemetry import trace
 
@@ -79,9 +80,11 @@ async def startup(ctx):
         else None
     )
 
-    # Recover requests interrupted between the database insert and Redis enqueue,
-    # plus documents left processing after ARQ's in-progress lease has expired.
+
+async def recover_ingestion_documents(ctx):
+    """Re-enqueue queued requests and documents abandoned beyond the ARQ lease."""
     recoverable = await ctx["db"].recoverable_ingestion_documents()
+    logger = logging.getLogger(__name__)
     for document in recoverable:
         metadata = document["metadata"] or {}
         storage_path = metadata.get("storage_path")
@@ -94,10 +97,11 @@ async def startup(ctx):
             )
             continue
 
+        processing_started_at = metadata.get("processing_started_at")
         job_id = (
             f"ingest:{document['document_id']}"
-            if metadata.get("processing_started_at") is None
-            else f"ingest-recovery:{document['document_id']}:{metadata['processing_started_at']}"
+            if processing_started_at is None
+            else f"ingest-recovery:{document['document_id']}:{processing_started_at}"
         )
         try:
             await ctx["redis"].enqueue_job(
@@ -109,10 +113,30 @@ async def startup(ctx):
                 _job_id=job_id,
             )
         except Exception:
-            logging.getLogger(__name__).exception(
+            logger.exception(
                 "Could not requeue recovered document %s",
                 document["document_id"],
             )
+
+
+async def startup(ctx):
+    settings = get_settings()
+    pool = await asyncpg.create_pool(
+        dsn=settings.postgres_dsn,
+        min_size=1,
+        max_size=5,
+        command_timeout=60,
+    )
+    ctx["pool"] = pool
+    ctx["db"] = DocumentRepository(pool)
+    ctx["tracer"] = trace.get_tracer("neuroflow.ingestion.worker")
+    ctx["provider"] = (
+        OpenAIProvider(model="gpt-4o-mini", api_key=settings.llm_api_key)
+        if settings.llm_api_key
+        else None
+    )
+    await recover_ingestion_documents(ctx)
+
 
 
 async def shutdown(ctx):
@@ -123,6 +147,7 @@ async def shutdown(ctx):
 
 class WorkerSettings:
     functions = [ingest_job]
+    cron_jobs = [cron(recover_ingestion_documents, minute=set(range(60)))]
     # Keep module import side-effect free; runtime settings are loaded in startup().
     redis_settings = RedisSettings(
         host=os.getenv("REDIS_HOST", "localhost"),

@@ -72,6 +72,8 @@ async def lifespan(app: FastAPI):
                 model="gpt-4o-mini",
                 api_key=settings.llm_api_key,
             )
+            if settings.llm_api_key
+            else None
         )
         ingestion_queue = await create_pool(
             RedisSettings(

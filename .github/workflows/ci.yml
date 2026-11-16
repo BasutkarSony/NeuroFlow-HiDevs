@@ -63,6 +63,18 @@ jobs:
       - run: pip install -r backend/requirements.txt pytest pytest-asyncio
       - run: python -m pytest tests/integration/ -v
 
+  container-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Provide Compose-required local environment
+        run: |
+          printf 'POSTGRES_PASSWORD=ci-postgres-password\nREDIS_PASSWORD=ci-redis-password\n' > .env
+      - name: Validate Docker Compose configuration
+        run: docker compose -f infra/docker-compose.yml config --quiet
+      - name: Build API and worker image
+        run: docker build -f backend/Dockerfile -t neuroflow-api:ci .
+
   security:
     runs-on: ubuntu-latest
     steps:

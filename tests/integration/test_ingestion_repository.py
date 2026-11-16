@@ -162,6 +162,7 @@ async def test_ingestion_worker_processes_text_document_end_to_end():
             document_id,
             str(source_path),
             "text",
+            "worker-integration-test",
         )
 
         assert result["document_id"] == document_id

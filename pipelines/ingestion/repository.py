@@ -28,7 +28,7 @@ class DocumentRepository:
                     metadata, status
                 )
                 VALUES ($1, $2, $3, $4, $5::jsonb, 'queued')
-                ON CONFLICT (content_hash) DO NOTHING
+                ON CONFLICT ((metadata->>'client_id'), content_hash) DO NOTHING
                 RETURNING id
                 """,
                 filename,

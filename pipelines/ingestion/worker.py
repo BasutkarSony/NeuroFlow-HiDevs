@@ -1,7 +1,6 @@
 import asyncpg
 import logging
 import os
-import uuid
 from arq.connections import RedisSettings
 from arq.worker import Retry
 from opentelemetry import trace
@@ -98,7 +97,7 @@ async def startup(ctx):
         job_id = (
             f"ingest:{document['document_id']}"
             if metadata.get("processing_started_at") is None
-            else f"ingest-recovery:{document['document_id']}:{uuid.uuid4().hex}"
+            else f"ingest-recovery:{document['document_id']}:{metadata['processing_started_at']}"
         )
         try:
             await ctx["redis"].enqueue_job(

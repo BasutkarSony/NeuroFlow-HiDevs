@@ -1,6 +1,7 @@
 import asyncpg
 import os
 from arq.connections import RedisSettings
+from arq.worker import Retry
 from opentelemetry import trace
 
 from config import get_settings
@@ -9,16 +10,55 @@ from pipelines.ingestion.repository import DocumentRepository
 from providers.openai_provider import OpenAIProvider
 
 
+MAX_INGESTION_TRIES = 5
+PERMANENT_INGESTION_ERRORS = (
+    ValueError,
+    TypeError,
+    UnicodeError,
+    FileNotFoundError,
+    PermissionError,
+)
+
+
 async def ingest_job(ctx, document_id: str, file_path: str, source_type: str, client_id: str):
-    return await process_document(
-        document_id=document_id,
-        file_path=file_path,
-        source_type=source_type,
-        client_id=client_id,
-        db=ctx["db"],
-        provider=ctx.get("provider"),
-        tracer=ctx.get("tracer"),
-    )
+    db = ctx["db"]
+    try:
+        return await process_document(
+            document_id=document_id,
+            file_path=file_path,
+            source_type=source_type,
+            client_id=client_id,
+            db=db,
+            provider=ctx.get("provider"),
+            tracer=ctx.get("tracer"),
+        )
+    except Exception as exc:
+        job_try = int(ctx.get("job_try", 1))
+        if (
+            not isinstance(exc, PERMANENT_INGESTION_ERRORS)
+            and job_try < MAX_INGESTION_TRIES
+        ):
+            # Short exponential backoff, capped at one minute.
+            raise Retry(defer=min(2 ** (job_try - 1), 60)) from exc
+
+        try:
+            await db.update_document_status(
+                document_id,
+                "failed",
+                metadata={
+                    "error": str(exc)[:500],
+                    "attempts": job_try,
+                },
+            )
+        except Exception:
+            # Preserve the original ingestion exception; a later reconciliation
+            # pass can identify records left in processing state.
+            import logging
+
+            logging.getLogger(__name__).exception(
+                "Could not persist final failure for document %s", document_id
+            )
+        raise
 
 
 async def startup(ctx):
@@ -57,5 +97,6 @@ class WorkerSettings:
     on_startup = startup
     on_shutdown = shutdown
     max_jobs = 5
+    max_tries = MAX_INGESTION_TRIES
     job_timeout = 900
     keep_result = 3600

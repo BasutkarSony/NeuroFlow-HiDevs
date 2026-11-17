@@ -15,7 +15,8 @@ COPY --from=deps /usr/local/bin /usr/local/bin
 COPY backend/ .
 COPY pipelines/ ./pipelines/
 COPY infra/ ./infra/
-RUN chown -R neuroflow:neuroflow /app
+RUN mkdir -p /data/ingestion \
+    && chown -R neuroflow:neuroflow /app /data
 USER neuroflow
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 CMD python -c "import urllib.request; urllib.request.urlopen(\"http://localhost:8000/health\")" || exit 1

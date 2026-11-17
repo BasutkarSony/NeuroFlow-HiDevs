@@ -111,7 +111,7 @@ jobs:
 
 
 
-          printf 'NeuroFlow compose smoke test: durable ingestion worker path.\n' > /tmp/neuroflow-smoke.txt
+          printf 'title,description\\nNeuroFlow,compose smoke test for durable ingestion worker path\\n' > /tmp/neuroflow-smoke.csv
           response="$(curl -fsS http://localhost:8000/ingest/file \
             -H "Authorization: Bearer $token" \
             -F 'source_type=file' \

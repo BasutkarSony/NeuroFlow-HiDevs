@@ -4,14 +4,19 @@ COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 FROM python:3.11-slim AS runtime
-RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
+RUN apt-get update \
+    && apt-get upgrade -y \
+    && apt-get install -y --no-install-recommends tesseract-ocr \
+    && rm -rf /var/lib/apt/lists/*
 RUN groupadd -r neuroflow && useradd -r -g neuroflow neuroflow
 WORKDIR /app
 COPY --from=deps /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=deps /usr/local/bin /usr/local/bin
 COPY backend/ .
 COPY pipelines/ ./pipelines/
-RUN chown -R neuroflow:neuroflow /app
+COPY infra/ ./infra/
+RUN mkdir -p /data/ingestion \
+    && chown -R neuroflow:neuroflow /app /data
 USER neuroflow
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 CMD python -c "import urllib.request; urllib.request.urlopen(\"http://localhost:8000/health\")" || exit 1

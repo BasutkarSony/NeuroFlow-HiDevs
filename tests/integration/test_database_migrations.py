@@ -104,3 +104,95 @@ async def test_fresh_schema_and_existing_schema_upgrade():
             assert migration_count == 1
     finally:
         await pool.close()
+
+
+
+@pytest.mark.asyncio
+async def test_tenant_deduplication_migration_replaces_global_unique_constraint():
+    database_url = os.getenv("TEST_DATABASE_URL")
+    if not database_url:
+        pytest.skip("TEST_DATABASE_URL is not configured")
+
+    pool = await asyncpg.create_pool(database_url, min_size=1, max_size=2)
+    assert pool is not None
+
+    try:
+        async with pool.acquire() as connection:
+            await connection.execute("DROP SCHEMA public CASCADE")
+            await connection.execute("CREATE SCHEMA public")
+
+        await ensure_schema(pool)
+
+        # Recreate the legacy global uniqueness rule before applying migration 003.
+        async with pool.acquire() as connection:
+            await connection.execute(
+                """
+                DROP INDEX documents_client_content_hash_uidx;
+                ALTER TABLE documents
+                    ADD CONSTRAINT documents_content_hash_key UNIQUE (content_hash);
+                DELETE FROM schema_migrations WHERE version = 3;
+                """
+            )
+
+        await ensure_schema(pool)
+
+        async with pool.acquire() as connection:
+            tenant_index_exists = await connection.fetchval(
+                """
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM pg_indexes
+                    WHERE schemaname = 'public'
+                      AND indexname = 'documents_client_content_hash_uidx'
+                )
+                """
+            )
+            global_constraint_exists = await connection.fetchval(
+                """
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM pg_constraint
+                    WHERE conname = 'documents_content_hash_key'
+                )
+                """
+            )
+            assert tenant_index_exists is True
+            assert global_constraint_exists is False
+
+            shared_hash = "tenant-migration-shared-content-hash"
+            first_id = await connection.fetchval(
+                """
+                INSERT INTO documents (filename, source_type, content_hash, metadata)
+                VALUES ('tenant-a.txt', 'text', $1, '{"client_id":"tenant-a"}')
+                RETURNING id
+                """,
+                shared_hash,
+            )
+            second_id = await connection.fetchval(
+                """
+                INSERT INTO documents (filename, source_type, content_hash, metadata)
+                VALUES ('tenant-b.txt', 'text', $1, '{"client_id":"tenant-b"}')
+                RETURNING id
+                """,
+                shared_hash,
+            )
+            assert first_id is not None
+            assert second_id is not None
+
+            duplicate_id = await connection.fetchval(
+                """
+                INSERT INTO documents (filename, source_type, content_hash, metadata)
+                VALUES ('tenant-a-duplicate.txt', 'text', $1, '{"client_id":"tenant-a"}')
+                ON CONFLICT ((metadata->>'client_id'), content_hash) DO NOTHING
+                RETURNING id
+                """,
+                shared_hash,
+            )
+            assert duplicate_id is None
+
+            applied_version = await connection.fetchval(
+                "SELECT version FROM schema_migrations WHERE version = 3"
+            )
+            assert applied_version == 3
+    finally:
+        await pool.close()

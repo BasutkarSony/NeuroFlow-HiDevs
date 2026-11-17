@@ -112,13 +112,20 @@ jobs:
 
 
           printf 'title,description\nNeuroFlow,compose smoke test for durable ingestion worker path\n' > /tmp/neuroflow-smoke.csv
-          response="$(curl -fsS http://localhost:8000/ingest/file \
+          upload_response="$(curl -sS -w 'HTTP_STATUS:%{http_code}' http://localhost:8000/ingest/file \
             -H "Authorization: Bearer $token" \
             -F 'source_type=file' \
             -F 'filename=compose-smoke.csv' \
             -F 'metadata={"source":"ci-compose-smoke"}' \
             -F 'file=@/tmp/neuroflow-smoke.csv;type=text/csv')"
-          ingestion_id="$(printf '%s' "$response" | python -c 'import json,sys; print(json.load(sys.stdin)["ingestion_id"])')"
+          upload_status="${upload_response##*HTTP_STATUS:}"
+          upload_body="${upload_response%HTTP_STATUS:*}"
+          if [ "$upload_status" != "202" ]; then
+            echo "File ingestion returned HTTP $upload_status: $upload_body"
+            docker compose -f infra/docker-compose.yml logs --no-color api worker redis postgres
+            exit 1
+          fi
+          ingestion_id="$(printf '%s' "$upload_body" | python -c 'import json,sys; print(json.load(sys.stdin)["ingestion_id"])')"
 
           for attempt in $(seq 1 30); do
             status="$(curl -fsS "http://localhost:8000/ingest/$ingestion_id" -H "Authorization: Bearer $token")"

@@ -156,7 +156,8 @@ jobs:
       - run: pip install detect-secrets pip-audit
       - run: pip-audit -r backend/requirements.txt
       - run: detect-secrets scan --baseline .secrets.baseline
-      # Keep the production dependency audit blocking. The current high-severity
-      # picomatch advisory is in dev-only frontend tooling and has no confirmed fix.
-      # Re-enable a full-tree audit after the upstream package publishes a patched release.
+      # Keep the full-tree result visible while the upstream dev-tool dependency has no confirmed fix.
+      - name: Report full frontend dependency audit
+        run: npm audit --prefix frontend --audit-level=high || echo "::warning::Full frontend audit reports the currently unpatched picomatch advisory in dev-only tooling."
+      # Block releases on production dependencies; re-enable a blocking full-tree audit after the dev-tool fix lands.
       - run: npm audit --prefix frontend --omit=dev --audit-level=high

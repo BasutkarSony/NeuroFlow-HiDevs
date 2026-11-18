@@ -1,5 +1,7 @@
 import ipaddress
+import io
 import socket
+import zipfile
 from urllib.parse import urlparse
 
 import bleach
@@ -207,6 +209,21 @@ def validate_file_content(
             ) from exc
 
         return "csv"
+
+    if extension == "docx":
+        # DOCX is an Office Open XML package, not just any ZIP archive.
+        try:
+            with zipfile.ZipFile(io.BytesIO(content)) as archive:
+                members = set(archive.namelist())
+        except (OSError, zipfile.BadZipFile):
+            members = set()
+
+        if not {"[Content_Types].xml", "word/document.xml"}.issubset(members):
+            raise HTTPException(
+                status_code=400,
+                detail="File content is not a valid DOCX document",
+            )
+        return "docx"
 
     signatures = FILE_SIGNATURES.get(extension, [])
 

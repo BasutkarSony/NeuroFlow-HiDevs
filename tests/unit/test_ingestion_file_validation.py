@@ -43,3 +43,18 @@ def test_invalid_zip_bytes_are_not_accepted_as_docx():
         validate_file_content("notes.docx", b"PK\\x03\\x04not-a-zip", DOCX_MIME)
 
     assert exc_info.value.status_code == 400
+
+
+def test_user_metadata_cannot_override_internal_recovery_fields():
+    from backend.api.ingest import _sanitize_metadata
+
+    sanitized = _sanitize_metadata(
+        {
+            "department": "engineering",
+            "processing_started_at": "not-a-timestamp",
+            "client_id": "attacker-controlled",
+            "storage_path": "/etc/passwd",
+        }
+    )
+
+    assert sanitized == {"department": "engineering"}

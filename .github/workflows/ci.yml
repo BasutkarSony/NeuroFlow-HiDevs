@@ -79,7 +79,14 @@ jobs:
         run: docker compose -f infra/docker-compose.yml config --quiet
       - name: Build API and worker image
         run: docker build -f backend/Dockerfile -t neuroflow-api:ci .
-      - name: Scan API image for critical vulnerabilities\n        uses: aquasecurity/trivy-action@master\n        with:\n          image-ref: neuroflow-api:ci\n          exit-code: \"1\"\n          severity: CRITICAL\n          trivyignores: .trivyignore\n      - name: Start infrastructure, API, and worker
+      - name: Scan API image for critical vulnerabilities
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: neuroflow-api:ci
+          exit-code: "1"
+          severity: CRITICAL
+          trivyignores: .trivyignore
+      - name: Start infrastructure, API, and worker
         run: docker compose -f infra/docker-compose.yml up -d postgres redis mlflow api worker
       - name: Verify health and file ingestion through ARQ worker
         shell: bash

@@ -24,7 +24,7 @@ mlflow==3.17.2
 PyJWT[crypto]==2.15.1
 bleach==6.4.0
 detect-secrets==1.5.0
-apscheduler>=3.11,<4
+apscheduler>=3.11.3,<4
 structlog>=24.1
 # Document ingestion extractors
 python-docx==1.2.0

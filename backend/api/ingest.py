@@ -36,9 +36,23 @@ class IngestRequest(BaseModel):
 
 
 def _sanitize_metadata(metadata: dict[str, Any]) -> dict[str, str]:
+    # These fields are owned by the ingestion service. In particular,
+    # processing_started_at must remain a valid timestamp for recovery scans.
+    reserved_keys = {
+        "client_id",
+        "storage_path",
+        "processing_started_at",
+        "content_hash",
+        "page_count",
+        "chunk_count",
+        "embedding_count",
+        "error",
+        "attempts",
+    }
     return {
         sanitize_text(str(key)).strip(): sanitize_text(str(value)).strip()
         for key, value in metadata.items()
+        if sanitize_text(str(key)).strip().lower() not in reserved_keys
     }
 
 

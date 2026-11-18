@@ -1,6 +1,7 @@
 import io
 import zipfile
 
+from docx import Document
 import pytest
 from fastapi import HTTPException
 
@@ -14,9 +15,9 @@ DOCX_MIME = (
 
 def make_docx_package() -> bytes:
     buffer = io.BytesIO()
-    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
-        archive.writestr("[Content_Types].xml", "<Types/>")
-        archive.writestr("word/document.xml", "<w:document/>")
+    document = Document()
+    document.add_paragraph("A valid Word document")
+    document.save(buffer)
     return buffer.getvalue()
 
 

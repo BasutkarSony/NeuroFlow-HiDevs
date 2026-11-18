@@ -15,6 +15,18 @@ COPY --from=deps /usr/local/bin /usr/local/bin
 COPY backend/ .
 COPY pipelines/ ./pipelines/
 COPY infra/ ./infra/
+RUN python - <<'PY'
+from lxml import etree
+
+minimum = (2, 11, 0)
+assert etree.LIBXML_VERSION >= minimum, (
+    f"lxml runtime uses vulnerable libxml2 {etree.LIBXML_VERSION}; expected >= {minimum}"
+)
+assert etree.LIBXML_COMPILED_VERSION >= minimum, (
+    f"lxml was compiled with vulnerable libxml2 {etree.LIBXML_COMPILED_VERSION}; expected >= {minimum}"
+)
+print(f"Verified lxml runtime libxml2 version: {etree.LIBXML_VERSION}")
+PY
 RUN mkdir -p /data/ingestion \
     && chown -R neuroflow:neuroflow /app /data
 USER neuroflow

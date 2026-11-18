@@ -1,0 +1,8 @@
+query_id,query,expected_source_file,supporting_fact,relevant_chunk_ids,reviewer,notes
+Q01,What is the maximum supported file upload size?,ingestion-lifecycle.csv,The maximum file size is 25 MiB.,,,,
+Q02,How many tokens are used for fixed-size chunks and overlap?,chunking-strategy.csv,Fixed-size chunking uses 512 tokens with 64-token overlap.,,,,
+Q03,What happens to embeddings when no provider is configured?,embedding-configuration.csv,Chunks can be persisted without vector embeddings and embedding_count reports the count.,,,,
+Q04,Which search methods are combined before reranking?,hybrid-retrieval.csv,Dense vector search and sparse PostgreSQL full-text search plus optional metadata retrieval are fused with weighted RRF.,,,,
+Q05,Which cross-encoder reranker does NeuroFlow use?,reranking-and-context.csv,cross-encoder/ms-marco-MiniLM-L-6-v2,,,,
+Q06,How is MRR calculated when no relevant chunk is retrieved?,evaluation-metrics.csv,The query contributes zero to reciprocal rank when no relevant chunk is retrieved.,,,,
+Q07,Why must benchmark labels use chunk UUIDs instead of document UUIDs?,tenant-and-provenance.csv,Retrieval evaluation compares returned chunk IDs with relevant_chunk_ids.,,,,

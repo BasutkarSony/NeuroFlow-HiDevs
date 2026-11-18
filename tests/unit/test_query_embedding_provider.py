@@ -7,9 +7,6 @@ from backend.api import query as query_api
 from backend.security.auth import ClientProfile
 
 
-from backend.security.auth import ClientProfile
-
-
 @pytest.mark.asyncio
 async def test_query_passes_configured_provider_to_retrieval_pipeline(monkeypatch):
     provider = object()

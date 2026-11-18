@@ -134,19 +134,28 @@ async def _submit_ingestion(
             client_id,
             document_id,
         )
+        if document_id is not None:
+            # The source and queued database record are durable. The recovery
+            # worker will enqueue this document when Redis becomes available.
+            return {
+                "ingestion_id": document_id,
+                "status": "queued",
+                "source_type": source_type,
+                "filename": filename,
+                "queue_deferred": True,
+            }
+
         try:
-            if document_id is None:
-                await asyncio.to_thread(file_path.unlink, missing_ok=True)
-            # Keep the persisted record queued. The recovery worker retries
-            # enqueueing it after Redis becomes available; marking it failed
-            # here would make a client retry hit the tenant dedupe constraint.
-        except Exception:
-            pass
+            await asyncio.to_thread(file_path.unlink, missing_ok=True)
+        except OSError:
+            logging.getLogger(__name__).warning(
+                "Could not remove unpersisted ingestion source %s", file_path
+            )
         raise HTTPException(
             status_code=503,
             detail={
                 "error": "INGESTION_QUEUE_UNAVAILABLE",
-                "message": "The ingestion request could not be queued. Please retry.",
+                "message": "The ingestion request could not be persisted. Please retry.",
             },
         ) from exc
 

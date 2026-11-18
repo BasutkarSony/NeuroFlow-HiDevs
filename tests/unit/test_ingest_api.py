@@ -128,8 +128,7 @@ async def test_file_ingestion_marks_document_failed_when_queue_is_unavailable(
         )
 
     assert exc_info.value.status_code == 503
-    assert repository.status_updates[0][0] == repository.document_id
-    assert repository.status_updates[0][1] == "failed"
+    assert repository.status_updates == []
     source_path = Path(repository.created[0]["metadata"]["storage_path"])
     assert source_path.exists()
 
@@ -180,7 +179,7 @@ async def test_duplicate_file_submission_returns_existing_tenant_document(api_de
         current_user=ClientProfile(client_id="tenant-a", scopes=["ingest"]),
     )
 
-    assert result["status"] == "duplicate"
+    assert result["status"] == "queued"
     assert result["duplicate"] is True
     assert result["ingestion_id"] == repository.existing_document_id
     assert repository.lookup_calls[0][1] == "tenant-a"

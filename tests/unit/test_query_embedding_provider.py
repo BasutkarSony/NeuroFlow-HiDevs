@@ -1,6 +1,7 @@
+from types import SimpleNamespace
+
 import pytest
 from fastapi import HTTPException
-from types import SimpleNamespace
 
 from backend.api import query as query_api
 from backend.security.auth import ClientProfile
@@ -39,3 +40,4 @@ async def test_query_passes_configured_provider_to_retrieval_pipeline(monkeypatc
 
     assert exc_info.value.status_code == 501
     assert captured["embedding_provider"] is provider
+    assert captured["client_id"] == "test-client"

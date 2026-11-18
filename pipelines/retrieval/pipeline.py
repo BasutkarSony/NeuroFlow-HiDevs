@@ -9,6 +9,7 @@ class RetrievalPipeline:
     def __init__(
         self,
         db,
+        client_id: str,
         embedding_provider=None,
         query_processor=None,
         reranker=None,
@@ -29,6 +30,7 @@ class RetrievalPipeline:
 
         self.retriever = HybridRetriever(
             db=db,
+            client_id=client_id,
             embedding_provider=embedding_provider,
             query_processor=query_processor,
             dense_k=dense_k,

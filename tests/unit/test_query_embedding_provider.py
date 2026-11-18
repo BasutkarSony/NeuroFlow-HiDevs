@@ -1,8 +1,12 @@
-import pytest
-from fastapi import HTTPException
 from types import SimpleNamespace
 
+import pytest
+from fastapi import HTTPException
+
 from backend.api import query as query_api
+from backend.security.auth import ClientProfile
+
+
 from backend.security.auth import ClientProfile
 
 

@@ -1,5 +1,8 @@
 from contextlib import asynccontextmanager
 
+from arq import create_pool
+from arq.connections import RedisSettings
+
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import Response
 from monitoring.metrics import (
@@ -60,22 +63,35 @@ tracer = trace.get_tracer(__name__)
 async def lifespan(app: FastAPI):
     """Manage shared infrastructure resources."""
     pool = await db_pool.create()
-
-    await ensure_schema(pool)
-    configure_provider(
-        OpenAIProvider(
-            model="gpt-4o-mini",
-            api_key=settings.llm_api_key,
-        )
-    )
-
-    scheduler = create_scheduler(pool)
-    scheduler.start()
-
+    scheduler = None
+    ingestion_queue = None
     try:
+        await ensure_schema(pool)
+        configure_provider(
+            OpenAIProvider(
+                model="gpt-4o-mini",
+                api_key=settings.llm_api_key,
+            )
+            if settings.llm_api_key
+            else None
+        )
+        ingestion_queue = await create_pool(
+            RedisSettings(
+                host=settings.redis_host,
+                port=settings.redis_port,
+                password=settings.redis_password,
+                database=0,
+            )
+        )
+        app.state.ingestion_queue = ingestion_queue
+        scheduler = create_scheduler(pool)
+        scheduler.start()
         yield
     finally:
-        scheduler.shutdown(wait=False)
+        if scheduler is not None:
+            scheduler.shutdown(wait=False)
+        if ingestion_queue is not None:
+            await ingestion_queue.aclose()
         await db_pool.close()
 
 

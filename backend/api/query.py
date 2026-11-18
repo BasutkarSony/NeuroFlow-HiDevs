@@ -99,6 +99,7 @@ async def query(
 
     retrieval = RetrievalPipeline(
         db=db,
+        client_id=current_user.client_id,
         embedding_provider=provider,
         dense_k=int(retrieval_config.get("dense_k", 20)),
         sparse_k=int(retrieval_config.get("sparse_k", 20)),

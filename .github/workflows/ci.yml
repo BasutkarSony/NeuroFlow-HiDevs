@@ -9,7 +9,7 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
@@ -20,7 +20,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
@@ -56,7 +56,7 @@ jobs:
       TEST_DATABASE_URL: postgresql://neuroflow:neuroflow_test@localhost:5432/neuroflow_test
       TEST_REDIS_URL: redis://localhost:6379/0
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
@@ -71,7 +71,7 @@ jobs:
       JWT_SECRET_KEY: ci-jwt-secret-change-this
       AUTH_CLIENT_SECRET: ci-client-secret
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Provide Compose-required local environment
         run: |
           printf 'POSTGRES_PASSWORD=ci-postgres-password\nREDIS_PASSWORD=ci-redis-password\nJWT_SECRET_KEY=ci-jwt-secret-change-this\nAUTH_CLIENT_SECRET=ci-client-secret\n' > .env
@@ -149,7 +149,7 @@ jobs:
   security:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
           python-version: "3.11"

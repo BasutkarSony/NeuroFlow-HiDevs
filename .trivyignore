@@ -1,0 +1,7 @@
+# CVE-2026-6653 is reported for Debian Trixie's system libxml2 package.
+# Debian currently tracks Trixie as "no-dsa" for this issue (minor issue; no fixed
+# Trixie package is published). The application XML path uses lxml, whose runtime
+# and compiled libxml2 versions are asserted >= 2.11.0 in backend/Dockerfile.
+# Python's standard XML parser uses Expat; Tesseract is used for image OCR, not XML.
+# Reassess this exception when Debian publishes a Trixie fix or parser usage changes.
+CVE-2026-6653

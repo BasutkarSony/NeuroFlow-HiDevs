@@ -95,7 +95,7 @@ async def _submit_ingestion(
             existing = await repository.get_document_by_hash(content_hash, client_id)
             return {
                 "ingestion_id": str(existing["id"]) if existing else None,
-                "status": "duplicate",
+                "status": existing["status"] if existing else "duplicate",
                 "source_type": source_type,
                 "duplicate": True,
             }
@@ -137,13 +137,9 @@ async def _submit_ingestion(
         try:
             if document_id is None:
                 await asyncio.to_thread(file_path.unlink, missing_ok=True)
-            else:
-                repository = DocumentRepository(db_pool.get_pool())
-                await repository.update_document_status(
-                    document_id,
-                    "failed",
-                    metadata={"enqueue_error": str(exc)[:500]},
-                )
+            # Keep the persisted record queued. The recovery worker retries
+            # enqueueing it after Redis becomes available; marking it failed
+            # here would make a client retry hit the tenant dedupe constraint.
         except Exception:
             pass
         raise HTTPException(
@@ -177,7 +173,7 @@ async def ingest(
             detail={"error": "INVALID_URL", "message": "source_url is required"},
         )
 
-    source_url = validate_document_url(source_url)
+    source_url = await asyncio.to_thread(validate_document_url, source_url)
     parsed = urlparse(source_url)
     filename = sanitize_text(payload.filename or Path(parsed.path).name or "webpage").strip()
     if not filename:

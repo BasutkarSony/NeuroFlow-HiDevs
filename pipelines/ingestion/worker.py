@@ -78,12 +78,10 @@ async def recover_ingestion_documents(ctx):
             )
             continue
 
-        processing_started_at = metadata.get("processing_started_at")
-        job_id = (
-            f"ingest:{document['document_id']}"
-            if processing_started_at is None
-            else f"ingest-recovery:{document['document_id']}:{processing_started_at}"
-        )
+        # Reuse the original deterministic ID for every retry and recovery
+        # enqueue. ARQ then rejects a second live/deferred job for this document,
+        # preventing recovery from racing an existing retry with a new job ID.
+        job_id = f"ingest:{document['document_id']}"
         try:
             await ctx["redis"].enqueue_job(
                 "ingest_job",
@@ -117,7 +115,6 @@ async def startup(ctx):
         else None
     )
     await recover_ingestion_documents(ctx)
-
 
 
 async def shutdown(ctx):

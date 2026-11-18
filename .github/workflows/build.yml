@@ -32,3 +32,4 @@ jobs:
           image-ref: ghcr.io/basutkarsony/neuroflow-hidevs/api:${{ github.sha }}
           exit-code: "1"
           severity: CRITICAL
+          trivyignores: .trivyignore

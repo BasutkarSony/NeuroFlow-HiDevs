@@ -16,6 +16,7 @@ class HybridRetriever:
     def __init__(
         self,
         db,
+        client_id: str,
         embedding_provider=None,
         query_processor=None,
         dense_k: int = 20,
@@ -25,7 +26,10 @@ class HybridRetriever:
         fusion_k: int = 60,
         fusion_weights: list[float] | None = None,
     ):
+        if not client_id or not client_id.strip():
+            raise ValueError("client_id is required for tenant-scoped retrieval.")
         self.db = db
+        self.client_id = client_id
         self.embedding_provider = embedding_provider
         self.query_processor = (
             query_processor or QueryProcessor(
@@ -98,16 +102,19 @@ class HybridRetriever:
         rows = await self.db.fetch(
             """
             SELECT
-                id,
-                content,
-                metadata,
-                embedding <=> $1::vector AS distance
-            FROM chunks
-            WHERE embedding IS NOT NULL
-            ORDER BY embedding <=> $1::vector
-            LIMIT $2
+                c.id,
+                c.content,
+                c.metadata,
+                c.embedding <=> $1::vector AS distance
+            FROM chunks AS c
+            JOIN documents AS d ON d.id = c.document_id
+            WHERE c.embedding IS NOT NULL
+              AND d.metadata->>'client_id' = $2
+            ORDER BY c.embedding <=> $1::vector
+            LIMIT $3
             """,
             embedding,
+            self.client_id,
             k,
         )
 
@@ -130,25 +137,28 @@ class HybridRetriever:
         rows = await self.db.fetch(
             """
             SELECT
-                id,
-                content,
-                metadata,
+                c.id,
+                c.content,
+                c.metadata,
                 ts_rank_cd(
-                    to_tsvector('english', content),
+                    to_tsvector('english', c.content),
                     plainto_tsquery('english', $1)
                 ) AS rank
-            FROM chunks
-            WHERE to_tsvector(
-                'english',
-                content
-            ) @@ plainto_tsquery(
-                'english',
-                $1
-            )
+            FROM chunks AS c
+            JOIN documents AS d ON d.id = c.document_id
+            WHERE d.metadata->>'client_id' = $2
+              AND to_tsvector(
+                  'english',
+                  c.content
+              ) @@ plainto_tsquery(
+                  'english',
+                  $1
+              )
             ORDER BY rank DESC
-            LIMIT $2
+            LIMIT $3
             """,
             query,
+            self.client_id,
             k,
         )
 
@@ -188,17 +198,21 @@ class HybridRetriever:
         rows = await self.db.fetch(
             """
             SELECT
-                id,
-                content,
-                metadata,
-                embedding <=> $1::vector AS distance
-            FROM chunks
-            WHERE metadata @> $2::jsonb
-            ORDER BY embedding <=> $1::vector
-            LIMIT $3
+                c.id,
+                c.content,
+                c.metadata,
+                c.embedding <=> $1::vector AS distance
+            FROM chunks AS c
+            JOIN documents AS d ON d.id = c.document_id
+            WHERE d.metadata->>'client_id' = $3
+              AND c.metadata @> $2::jsonb
+              AND c.embedding IS NOT NULL
+            ORDER BY c.embedding <=> $1::vector
+            LIMIT $4
             """,
             embedding,
             metadata,
+            self.client_id,
             k,
         )
 

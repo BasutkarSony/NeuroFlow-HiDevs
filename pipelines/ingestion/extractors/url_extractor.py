@@ -12,6 +12,26 @@ from . import ExtractedPage
 
 REDIRECT_STATUSES = {301, 302, 303, 307, 308}
 MAX_REDIRECTS = 5
+MAX_RESPONSE_SIZE = 10 * 1024 * 1024
+RESPONSE_CHUNK_SIZE = 64 * 1024
+
+
+async def _read_limited_response(response: aiohttp.ClientResponse) -> str:
+    """Read a response body without allowing unbounded memory use."""
+    if response.content_length is not None and response.content_length > MAX_RESPONSE_SIZE:
+        raise ValueError("URL response exceeds the 10 MiB size limit")
+
+    body = bytearray()
+    async for chunk in response.content.iter_chunked(RESPONSE_CHUNK_SIZE):
+        body.extend(chunk)
+        if len(body) > MAX_RESPONSE_SIZE:
+            raise ValueError("URL response exceeds the 10 MiB size limit")
+
+    encoding = response.charset or "utf-8"
+    try:
+        return body.decode(encoding)
+    except (LookupError, UnicodeDecodeError):
+        return body.decode("utf-8", errors="replace")
 
 
 class _PinnedResolver(aiohttp.abc.AbstractResolver):
@@ -83,7 +103,7 @@ async def _get_with_safe_redirects(url: str) -> tuple[str, str]:
             async with client.get(current_url, allow_redirects=False) as response:
                 if response.status not in REDIRECT_STATUSES:
                     response.raise_for_status()
-                    return await response.text(), str(response.url)
+                    return await _read_limited_response(response), str(response.url)
 
                 location = response.headers.get("location")
                 if not location:

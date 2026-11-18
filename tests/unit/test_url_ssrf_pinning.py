@@ -97,3 +97,51 @@ async def test_pinned_resolver_uses_only_prevalidated_addresses(monkeypatch):
 
     with pytest.raises(OSError, match="unexpected destination"):
         await resolver.resolve("internal.example", 443, socket.AF_UNSPEC)
+
+
+class _FakeContent:
+    def __init__(self, chunks):
+        self.chunks = chunks
+
+    async def iter_chunked(self, _size):
+        for chunk in self.chunks:
+            yield chunk
+
+
+class _FakeResponse:
+    def __init__(self, chunks, content_length=None, charset="utf-8"):
+        self.content = _FakeContent(chunks)
+        self.content_length = content_length
+        self.charset = charset
+
+
+@pytest.mark.asyncio
+async def test_limited_response_reads_and_decodes_body():
+    from pipelines.ingestion.extractors.url_extractor import _read_limited_response
+
+    response = _FakeResponse([b"hello ", b"world"])
+    assert await _read_limited_response(response) == "hello world"
+
+
+@pytest.mark.asyncio
+async def test_limited_response_rejects_oversized_content_length():
+    from pipelines.ingestion.extractors.url_extractor import (
+        MAX_RESPONSE_SIZE,
+        _read_limited_response,
+    )
+
+    response = _FakeResponse([], content_length=MAX_RESPONSE_SIZE + 1)
+    with pytest.raises(ValueError, match="10 MiB size limit"):
+        await _read_limited_response(response)
+
+
+@pytest.mark.asyncio
+async def test_limited_response_rejects_chunked_body_over_limit():
+    from pipelines.ingestion.extractors.url_extractor import (
+        MAX_RESPONSE_SIZE,
+        _read_limited_response,
+    )
+
+    response = _FakeResponse([b"x" * (MAX_RESPONSE_SIZE + 1)])
+    with pytest.raises(ValueError, match="10 MiB size limit"):
+        await _read_limited_response(response)

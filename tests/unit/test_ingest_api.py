@@ -116,18 +116,18 @@ async def test_file_ingestion_marks_document_failed_when_queue_is_unavailable(
     queue.error = RuntimeError("Redis unavailable")
     upload = UploadFile(filename="notes.txt", file=io.BytesIO(b"content"))
 
-    with pytest.raises(HTTPException) as exc_info:
-        await ingest_api.ingest_file(
-            fake_request(queue),
-            source_type="file",
-            filename="notes.txt",
-            pipeline_id=None,
-            metadata="{}",
-            file=upload,
-            current_user=ClientProfile(client_id="tenant-a", scopes=["ingest"]),
-        )
+    result = await ingest_api.ingest_file(
+        fake_request(queue),
+        source_type="file",
+        filename="notes.txt",
+        pipeline_id=None,
+        metadata="{}",
+        file=upload,
+        current_user=ClientProfile(client_id="tenant-a", scopes=["ingest"]),
+    )
 
-    assert exc_info.value.status_code == 503
+    assert result["status"] == "queued"
+    assert result["queue_deferred"] is True
     assert repository.status_updates == []
     source_path = Path(repository.created[0]["metadata"]["storage_path"])
     assert source_path.exists()

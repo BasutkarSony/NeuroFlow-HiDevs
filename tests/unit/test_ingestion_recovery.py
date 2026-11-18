@@ -25,7 +25,7 @@ class FakeQueue:
 
 
 @pytest.mark.asyncio
-async def test_recovery_requeues_abandoned_processing_document_with_stable_job_id():
+async def test_recovery_reuses_original_job_id_for_abandoned_processing_document():
     repository = RecoveryRepository(
         [
             {
@@ -52,7 +52,30 @@ async def test_recovery_requeues_abandoned_processing_document_with_stable_job_i
         "text",
         "client-1",
     )
-    assert kwargs["_job_id"] == "ingest-recovery:doc-123:2026-11-16T10:00:00+00:00"
+    assert kwargs["_job_id"] == "ingest:doc-123"
+    assert repository.failed == []
+
+
+@pytest.mark.asyncio
+async def test_recovery_uses_same_job_id_for_queued_document_without_processing_timestamp():
+    repository = RecoveryRepository(
+        [
+            {
+                "document_id": "doc-789",
+                "source_type": "text",
+                "metadata": {
+                    "client_id": "client-1",
+                    "storage_path": "/data/doc-789.source",
+                },
+            }
+        ]
+    )
+    queue = FakeQueue()
+
+    await recover_ingestion_documents({"db": repository, "redis": queue})
+
+    assert len(queue.jobs) == 1
+    assert queue.jobs[0][2]["_job_id"] == "ingest:doc-789"
     assert repository.failed == []
 
 

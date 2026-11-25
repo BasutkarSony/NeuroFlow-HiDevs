@@ -87,6 +87,24 @@ The template is intentionally not a benchmark input yet: its `relevant_chunk_ids
 
 Replace the illustrative placeholder with the actual database UUID. The JSON benchmark dataset must be non-empty and every query must have at least one real relevant chunk ID.
 
+## Generate the benchmark input
+
+After every annotation row has been reviewed and populated with real chunk UUIDs, generate the JSON file consumed by the benchmark:
+
+```bash
+python -m evaluation.build_retrieval_dataset \
+  --input evaluation/retrieval_annotation_template.csv \
+  --output evaluation/retrieval_test_set.json
+```
+
+The builder rejects blank labels, duplicate query IDs, malformed or repeated chunk UUIDs, and missing required columns. It does not invent labels or modify the CSV. The generated JSON is created only after the complete CSV passes validation. Then run:
+
+```bash
+python tests/benchmarks/retrieval_benchmark.py
+```
+
+The benchmark still requires a configured retrieval pipeline to calculate scores; generating the JSON validates annotations but does not claim retrieval quality.
+
 ## Benchmark controls and limitations
 
 - Keep this corpus version fixed for a benchmark run. If source content or chunking configuration changes, ingest a new version and relabel it.

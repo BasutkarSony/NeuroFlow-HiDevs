@@ -126,7 +126,7 @@ For file ingestion, `source_type`, `filename`, `pipeline_id`, and `metadata` are
 }
 ```
 
-A repeated content hash is treated as an idempotent submission. For a duplicate owned by the authenticated client, the response includes the existing ingestion ID and its current status (for example, `queued`, `processing`, `complete`, or `failed`), with `duplicate: true`. If the matching hash belongs to another client, the response does not expose that client's resource identifier; `ingestion_id` is null and the status is `duplicate`. The status resource is tenant-scoped to the authenticated client.
+A repeated content hash within the same client is treated as an idempotent submission. The response includes the existing ingestion ID and its current status (for example, `queued`, `processing`, `complete`, or `failed`), with `duplicate: true`. Content hashes are scoped to each client, so another client may independently ingest identical content. If the existing record cannot be retrieved after a duplicate conflict, `ingestion_id` is null and the status is `duplicate`. The status resource is tenant-scoped to the authenticated client.
 
 ## Errors
 
